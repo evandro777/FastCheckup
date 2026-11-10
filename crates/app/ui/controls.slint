@@ -1,0 +1,310 @@
+// Family kit v7: the small controls every Fast app draws the same way (see docs/UI-STYLE.md).
+// Copied verbatim into every app, like family.slint. No strings live here: the caller passes every label, so the gettext
+// contexts do not change.
+import { Palette } from "std-widgets.slint";
+import { Family } from "family.slint";
+
+// A page tab: bold title with a 2 px accent underline when active. Page tabs are underlined, filters are segmented.
+export component TabItem inherits Rectangle {
+    in property <string> title;
+    in property <bool> active;
+    callback clicked();
+    accessible-role: tab;
+    accessible-label: root.title;
+    accessible-item-selected: root.active;
+    accessible-action-default => { root.clicked(); }
+    background: touch.has-hover && !root.active ? Palette.alternate-background : transparent;
+    // The tab is always as wide as its bold title, so going bold on selection does not move the other tabs.
+    preferred-width: bold.preferred-width + 28px;
+    min-width: self.preferred-width;
+    bold := Text { text: root.title; font-weight: Family.section-weight; visible: false; }
+    touch := TouchArea { clicked => { root.clicked(); } }
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        Text {
+            text: root.title;
+            font-weight: root.active ? Family.section-weight : 400;
+            color: root.active ? Palette.foreground : Palette.foreground.with-alpha(0.65);
+            vertical-alignment: center;
+        }
+    }
+    Rectangle {
+        y: parent.height - 2px;
+        height: 2px;
+        background: root.active ? Palette.accent-background : transparent;
+    }
+}
+
+// The row that holds `TabItem`s: 32 px, left-aligned, with a hairline under it. `end-space` leaves room for a ☰ drawn over the row.
+export component TabBar inherits Rectangle {
+    in property <length> end-space: 0px;
+    // Between the children (tabs are usually one group; a row that also holds a checkbox and buttons sets it).
+    in property <length> gap: 0px;
+    height: 32px;
+    Rectangle { y: parent.height - 1px; height: 1px; background: Palette.border; }
+    HorizontalLayout {
+        alignment: start;
+        spacing: root.gap;
+        padding-right: root.end-space;
+        @children
+    }
+}
+
+// A borderless square button that holds a drawn icon (`@children`). Quiet until hovered.
+component GlyphButton inherits Rectangle {
+    in property <string> label;
+    callback clicked();
+    width: 28px;
+    height: 28px;
+    border-radius: Family.control-radius;
+    background: touch.has-hover ? Palette.foreground.with-alpha(0.1) : fs.has-focus ? Palette.foreground.with-alpha(0.06) : transparent;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    // Reachable with Tab, pressed with Space or Enter, like the Fluent Button it replaces.
+    if fs.has-focus: Rectangle {
+        x: -2px;
+        y: -2px;
+        width: parent.width + 4px;
+        height: parent.height + 4px;
+        border-width: 2px;
+        border-color: Palette.accent-background;
+        border-radius: Family.control-radius + 2px;
+    }
+    fs := FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+        touch := TouchArea { mouse-cursor: pointer; clicked => { fs.focus(); root.clicked(); } }
+    }
+    @children
+}
+
+// The burger that opens Preferences. Same size and look in every app.
+export component MenuButton inherits GlyphButton {
+    Path {
+        width: 14px;
+        height: 12px;
+        viewbox-width: 16;
+        viewbox-height: 14;
+        commands: "M 1 1 L 15 1 M 1 7 L 15 7 M 1 13 L 15 13";
+        stroke: Palette.foreground.with-alpha(0.85);
+        stroke-width: 2px;
+        stroke-line-cap: round;
+    }
+}
+
+// Remove or dismiss: a cross, for a row's delete button or a message's close button.
+export component CloseButton inherits GlyphButton {
+    Path {
+        width: 12px;
+        height: 12px;
+        viewbox-width: 12;
+        viewbox-height: 12;
+        commands: "M 1 1 L 11 11 M 11 1 L 1 11";
+        stroke: Palette.foreground.with-alpha(0.7);
+        stroke-width: 1.6px;
+        stroke-line-cap: round;
+    }
+}
+
+// Previous or next (an up or down chevron), for stepping through matches.
+export component StepButton inherits GlyphButton {
+    in property <bool> up;
+    Path {
+        width: 12px;
+        height: 8px;
+        viewbox-width: 12;
+        viewbox-height: 8;
+        commands: root.up ? "M 1 7 L 6 2 L 11 7" : "M 1 1 L 6 6 L 11 1";
+        stroke: Palette.foreground.with-alpha(0.8);
+        stroke-width: 1.8px;
+        stroke-line-cap: round;
+        stroke-line-join: round;
+    }
+}
+
+// A plus, for "New folder" style buttons. Drawn as a plain icon next to a label.
+export component PlusIcon inherits Path {
+    in property <color> tone: Palette.foreground;
+    width: 12px;
+    height: 12px;
+    viewbox-width: 12;
+    viewbox-height: 12;
+    commands: "M 6 1 L 6 11 M 1 6 L 11 6";
+    stroke: root.tone;
+    stroke-width: 1.8px;
+    stroke-line-cap: round;
+}
+
+// A warning triangle. Color is never the only sign of a warning: this goes with the words.
+export component AlertIcon inherits Path {
+    in property <color> tone: Family.warning;
+    width: 16px;
+    height: 14px;
+    viewbox-width: 16;
+    viewbox-height: 14;
+    commands: "M 8 1 L 15 13 L 1 13 Z M 8 5.5 L 8 9 M 8 11 L 8 11.2";
+    stroke: root.tone;
+    stroke-width: 1.6px;
+    stroke-line-cap: round;
+    stroke-line-join: round;
+}
+
+// A one-colour Lucide icon (`ui/icons`, ISC licence). The SVG is black; `colorize` repaints it, so one file serves every
+// theme and tone. Sizes: 16 in buttons and nav, 18 in headers, 14 for chevrons.
+export component Icon inherits Image {
+    in property <color> tone: Palette.foreground.with-alpha(0.62);
+    colorize: root.tone;
+    image-fit: contain;
+}
+
+// A small neutral label for a source or a category ("Flatpak"). A status uses a tinted chip instead, never this.
+export component NeutralBadge inherits Rectangle {
+    in property <string> text;
+    border-width: 1px;
+    border-color: Palette.border;
+    border-radius: Family.control-radius;
+    HorizontalLayout {
+        padding-left: 7px;
+        padding-right: 7px;
+        padding-top: 2px;
+        padding-bottom: 2px;
+        Text { text: root.text; color: Family.muted; font-size: Family.caption; horizontal-alignment: center; vertical-alignment: center; }
+    }
+}
+
+// A segmented control for filters and modes with a few options: one rounded track, the picked segment raised inside it.
+// It does not use the accent colour (green on Mint would read as "healthy"), and Left/Right move the pick when focused.
+export component FilterBar inherits Rectangle {
+    in property <[string]> labels;
+    // Optional 16 px icon before a label and its colour (same index); a segment without one looks as before.
+    in property <[image]> icons;
+    in property <[color]> tones;
+    in-out property <int> selected;
+    // Sort headers: clicking the selected chip again flips `flip` (the page draws the arrow in the label).
+    in property <bool> toggle-again;
+    in-out property <bool> flip;
+    callback picked();
+    height: Family.control-height;
+    border-radius: Family.control-radius;
+    background: Palette.foreground.with-alpha(0.06);
+    accessible-role: tab-list;
+    forward-focus: fs;
+    function pick(i: int) {
+        if (root.toggle-again && root.selected == i) {
+            root.flip = !root.flip;
+        } else {
+            root.selected = i;
+            root.flip = false;
+        }
+        root.picked();
+    }
+    // First child, so it sits below the segments: declared after them it took the first click as a focus click.
+    fs := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.LeftArrow && root.selected > 0) { root.pick(root.selected - 1); return accept; }
+            if (event.text == Key.RightArrow && root.selected < root.labels.length - 1) { root.pick(root.selected + 1); return accept; }
+            return reject;
+        }
+    }
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 2px;
+        for label[i] in root.labels : Rectangle {
+            // Grows with the label so longer translations are not clipped. Measured in bold, so picking a chip (which
+            // turns its label bold) never changes its width or moves its neighbours.
+            width: max(64px, chip-size.preferred-width + 20px + (root.icons.length > 0 ? 22px : 0px));
+            border-radius: Family.control-radius - 2px;
+            // Raised: lighter than the track in both themes (the dark page background is darker than the track).
+            background: root.selected == i ? (Family.dark ? Palette.foreground.with-alpha(0.16) : Palette.background) : fta.has-hover ? Palette.foreground.with-alpha(0.08) : transparent;
+            border-width: root.selected == i ? 1px : 0px;
+            border-color: Palette.foreground.with-alpha(0.25);
+            accessible-role: tab;
+            accessible-label: label;
+            accessible-checked: root.selected == i;
+            chip-size := Text { text: label; font-weight: Family.section-weight; visible: false; }
+            HorizontalLayout {
+                alignment: center;
+                spacing: 6px;
+                // The slot is kept (empty) on segments without an icon, so picking one never changes any width.
+                if root.icons.length > 0 : VerticalLayout { alignment: center; Icon { source: root.icons[i]; tone: root.tones[i]; width: 16px; height: 16px; } }
+                Text { text: label; color: root.selected == i ? Palette.foreground : Family.muted; font-weight: root.selected == i ? Family.section-weight : 400; horizontal-alignment: center; vertical-alignment: center; }
+            }
+            fta := TouchArea { clicked => { fs.focus(); root.pick(i); } }
+        }
+    }
+    // Focus ring in the accent colour around the whole track, so a keyboard user can see where they are.
+    if fs.has-focus : Rectangle { x: -2px; y: -2px; width: parent.width + 4px; height: parent.height + 4px; border-width: 2px; border-color: Palette.accent-background; border-radius: Family.control-radius + 2px; }
+}
+
+// The search box: soft fill, magnifier, accent ring when focused. Esc clears a non-empty box and is otherwise left alone,
+// so a popup can still close on it. `seq` ticks when the user types a letter or digit elsewhere on the page: the box then
+// takes focus and that character (`typed`), so typing anywhere starts a search. The caller passes `placeholder`.
+export component SearchBox inherits FocusScope {
+    in-out property <string> text <=> edit.text;
+    in property <string> placeholder;
+    in property <string> typed;
+    in property <int> seq;
+    out property <bool> has-text: edit.text != "";
+    // True while the text field itself has the keyboard (`has-focus` of this scope is false: it forwards the focus).
+    out property <bool> editing: edit.has-focus;
+    // `key` sees every key first (Up/Down/Delete/Menu of a list page); `reject` leaves it to the box.
+    callback key(KeyEvent) -> EventResult;
+    callback edited(string);
+    callback accepted();
+    public function select-all() { edit.select-all(); }
+    public function set-selection-offsets(a: int, b: int) { edit.set-selection-offsets(a, b); }
+    forward-focus: edit;
+    changed seq => {
+        edit.text = edit.text + root.typed;
+        edit.focus();
+        edit.set-selection-offsets(edit.text.character-count, edit.text.character-count);
+    }
+    // Captured, because the TextInput would otherwise handle the key first.
+    capture-key-pressed(event) => {
+        if (root.key(event) == EventResult.accept) {
+            return accept;
+        }
+        if (event.text == Key.Escape && edit.text != "") {
+            edit.text = "";
+            root.edited("");
+            return accept;
+        }
+        return reject;
+    }
+    height: Family.control-height;
+    Rectangle {
+        background: Palette.foreground.with-alpha(0.06);
+        border-radius: Family.control-radius;
+        border-width: edit.has-focus ? 2px : 0px;
+        border-color: Palette.accent-background;
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 8px;
+            VerticalLayout { alignment: center; Icon { source: @image-url("icons/search.svg"); width: 16px; height: 16px; } }
+            Rectangle {
+                horizontal-stretch: 1;
+                clip: true;
+                if edit.text == "" : Text { x: 0px; text: root.placeholder; color: Family.muted; horizontal-alignment: left; vertical-alignment: center; }
+                // A bare TextInput does not scroll: slide it so the caret stays inside the box.
+                edit := TextInput {
+                    width: max(parent.width, self.preferred-width);
+                    cursor-position-changed(p) => {
+                        if (p.x + self.x > parent.width - 2px) {
+                            self.x = parent.width - 2px - p.x;
+                        } else if (p.x + self.x < 0px) {
+                            self.x = -p.x;
+                        }
+                    }
+                    enabled: root.enabled; edited => { root.edited(self.text); } accepted => { root.accepted(); } color: Palette.foreground; single-line: true; vertical-alignment: center; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; }
+            }
+        }
+    }
+}

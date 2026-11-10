@@ -1,0 +1,49 @@
+// Family kit v9 (with about.slint and controls.slint): the colors, type scale and spacing shared by all Fast apps (see FastHello's
+// docs/UI-STYLE.md).
+// Copied verbatim into every app. Do not edit it in one app only: change FastHello's copy, bump the version above
+// and copy it to the others.
+import { Palette } from "std-widgets.slint";
+
+export global Family {
+    // Status colors. Two values each: the dark one is lighter so it reads on a dark background, the light one is
+    // darker so it reads on white (4.4:1 or better on each).
+    // Read from what the style draws, not from `Palette.color-scheme`: the app sets that to `unknown` for "System",
+    // and the style then follows the desktop, which this property cannot see. The background is #1C1C1C or #FAFAFA.
+    out property <bool> dark: Palette.background.to-hsv().value < 0.5;
+    out property <color> danger: root.dark ? #e5484d : #c9332b;
+    out property <color> warning: root.dark ? #e5a50a : #a86f00;
+    out property <color> success: root.dark ? #3fb950 : #1a7f37;
+    out property <color> info: root.dark ? #5b97f7 : #2f6fdb;
+    // Secondary text: the foreground, softened.
+    out property <color> muted: Palette.foreground.with-alpha(0.7);
+    // The picked row of a list or table: a quiet tint of the accent plus a 3 px accent bar on its left edge (`selected-bar`),
+    // never a full accent fill. The text keeps the foreground color.
+    out property <color> selected: Palette.accent-background.with-alpha(root.dark ? 0.26 : 0.18);
+    out property <length> selected-bar: 3px;
+    // The dim behind a dialog.
+    out property <color> scrim: #000000a0;
+
+    // Type scale. Nothing else: a size that is not here does not exist in the family.
+    out property <length> caption: 11px;
+    out property <length> body: 13px;
+    out property <length> title: 16px;
+    out property <length> page-title: 20px;
+    // Weights: 600 for section titles and names, 700 for page titles. No 500, nothing heavier.
+    out property <int> section-weight: 600;
+    out property <int> page-weight: 700;
+
+    // Spacing and shape.
+    out property <length> gap-s: 4px;
+    out property <length> gap-m: 8px;
+    out property <length> gap-l: 12px;
+    out property <length> gap-xl: 20px;
+    out property <length> radius: 8px;
+    // Small controls (nav items, segments, buttons, search boxes). Panels and dialogs use `radius`.
+    out property <length> control-radius: 6px;
+    // The height of every control in a row: Fluent's Button, ComboBox, LineEdit and SpinBox are 32 px, so the kit's
+    // SearchBox and FilterBar match them.
+    out property <length> control-height: 32px;
+    // Dialogs: every Preferences and About card is this wide, and a control beside its label is this wide.
+    out property <length> dialog-width: 380px;
+    out property <length> control-width: 190px;
+}

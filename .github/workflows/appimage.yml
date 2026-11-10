@@ -1,0 +1,106 @@
+name: AppImage
+
+# Builds the AppImage (and its .zsync for delta updates) and the .deb on every push to master and on pull requests,
+# and adds them to the GitHub release when a version tag (v0.2.0, ...) is pushed.
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: appimage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build AppImage
+    # Oldest runner on offer: the binary runs on any distro with a glibc at least as new.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag matches Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          crate=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          [ "${GITHUB_REF_NAME#v}" = "$crate" ] || { echo "tag != Cargo.toml $crate"; exit 1; }
+
+      - name: System deps
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig-dev libxkbcommon-dev libxkbcommon-x11-dev libx11-dev libxcb1-dev
+
+      - name: appimagetool
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+          # No FUSE on the runner: unpack instead of running the AppImage directly.
+          ./appimagetool --appimage-extract >/dev/null
+          sudo ln -s "$PWD/squashfs-root/AppRun" /usr/local/bin/appimagetool
+
+      - name: Build
+        run: appimage/build.sh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: appimage-x86_64
+          path: |
+            FastCheckup-*.AppImage
+            FastCheckup-*.AppImage.zsync
+
+  deb:
+    name: Build .deb
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag matches Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          crate=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          [ "${GITHUB_REF_NAME#v}" = "$crate" ] || { echo "tag != Cargo.toml $crate"; exit 1; }
+
+      - name: System deps
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig-dev libxkbcommon-dev libxkbcommon-x11-dev libx11-dev libxcb1-dev
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo-deb
+        run: cargo install cargo-deb --locked
+
+      # cargo-deb builds the release binary itself; the assets are listed in crates/app/Cargo.toml.
+      - name: Build
+        run: cargo deb -p fastcheckup --locked --output .
+
+      - name: Policy is inside
+        run: dpkg-deb -c fastcheckup_*.deb | grep -q usr/share/polkit-1/actions/io.github.evandro777.FastCheckup.policy
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deb-amd64
+          path: fastcheckup_*.deb
+
+  release:
+    name: Add to release
+    needs: [build, deb]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: appimage-x86_64
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb-amd64
+      # Create the release if no other workflow (e.g. an optional Flatpak one) got there first.
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes || sleep 20
+          gh release upload "$GITHUB_REF_NAME" FastCheckup-*.AppImage* fastcheckup_*.deb --repo "$GITHUB_REPOSITORY" --clobber

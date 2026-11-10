@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=FastCheckup
+Type=Application
+GenericName=System Inspector
+Comment=Inspect your system and act on each finding
+Exec=fastcheckup
+Categories=System;Monitor;
+Icon=io.github.evandro777.FastCheckup
+Terminal=false

@@ -1,0 +1,10 @@
+/target/
+__pycache__/
+/dev/data/
+/dev/run/
+/dev/*.png
+/dev/*.log
+/dev/*.pid
+/appimage/AppDir/
+/FastCheckup-*.AppImage*
+/squashfs-root/

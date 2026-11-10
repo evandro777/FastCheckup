@@ -1,0 +1,75 @@
+name: VirusTotal
+
+# Scans the release assets (AppImage and .deb) once the AppImage workflow (which builds both) has finished.
+# Separate from the release pipeline on purpose: if this breaks, the release is unaffected.
+# The release is created with GITHUB_TOKEN, which does not fire `release` events, hence workflow_run.
+on:
+  workflow_run:
+    workflows: [AppImage]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to scan (v0.2.0)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan release assets
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Scan release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VT_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+          TAG: ${{ inputs.tag || github.event.workflow_run.head_branch }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "FastCheckup-*.AppImage" --pattern "fastcheckup_*.deb" --dir assets
+          : > report.md
+          bad=0
+          for file in assets/*; do
+            name=$(basename "$file")
+            sha=$(sha256sum "$file" | cut -d' ' -f1)
+            status=
+            mal=0
+            sus=0
+            url=https://www.virustotal.com/api/v3/files
+            # Files over 32 MB need a one-off upload URL.
+            [ "$(stat -c%s "$file")" -gt 33554432 ] && url=$(curl -s -H "x-apikey: $VT_API_KEY" "$url/upload_url" | jq -r .data)
+            id=$(curl -s -H "x-apikey: $VT_API_KEY" -F "file=@$file" "$url" | jq -r .data.id)
+            if [ -n "$id" ] && [ "$id" != null ]; then
+              for i in $(seq 20); do
+                sleep 30 # free API: 4 requests/minute
+                res=$(curl -s -H "x-apikey: $VT_API_KEY" "https://www.virustotal.com/api/v3/analyses/$id")
+                status=$(echo "$res" | jq -r .data.attributes.status)
+                [ "$status" = completed ] && break
+              done
+              mal=$(echo "$res" | jq -r '.data.attributes.stats.malicious // 0')
+              sus=$(echo "$res" | jq -r '.data.attributes.stats.suspicious // 0')
+            fi
+            # Upload failure or timeout is "unknown", not "dangerous": only a finished scan can warn or pass.
+            if [ "$status" != completed ]; then
+              icon="❔"; text="scan did not finish, check the report"
+            elif [ "$mal" -gt 0 ] || [ "$sus" -gt 0 ]; then
+              icon="⚠️"; text="$mal malicious, $sus suspicious"; bad=1
+            else
+              icon="✅"; text="no detections"
+            fi
+            echo "- $icon **$name**: $text. [Report](https://www.virustotal.com/gui/file/$sha)" >> report.md
+          done
+          body=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body)
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$body
+
+          ## VirusTotal
+
+          $(cat report.md)"
+          exit $bad

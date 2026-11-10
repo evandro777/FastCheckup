@@ -1,0 +1,2248 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: pt_BR\n"
+
+msgctxt "Main"
+msgid "Part of the desktop. Disabling it may break your session."
+msgstr "Parte da área de trabalho. Desativar pode quebrar sua sessão."
+
+msgctxt "Main"
+msgid "Enabled"
+msgstr "Ativado"
+
+msgctxt "Main"
+msgid "Starts automatically when you log in. Disabling it only stops it from starting; the app stays installed."
+msgstr "Inicia automaticamente quando você entra. Desativar apenas impede que inicie; o aplicativo continua instalado."
+
+msgctxt "Main"
+msgid "Disabled. Enable makes it start automatically when you log in again."
+msgstr "Desativado. Ativar faz com que inicie automaticamente quando você entra de novo."
+
+msgctxt "Main"
+msgid "Enable"
+msgstr "Ativar"
+
+msgctxt "Main"
+msgid "{} s"
+msgstr "{} s"
+
+msgctxt "Main"
+msgid "Start delay in seconds (0 = none):"
+msgstr "Atraso na inicialização em segundos (0 = nenhum):"
+
+msgctxt "Main"
+msgid "Set delay"
+msgstr "Definir atraso"
+
+msgctxt "Main"
+msgid "Open in editor"
+msgstr "Abrir no editor"
+
+msgctxt "Main"
+msgid "Enable at startup: {}"
+msgstr "Ativar na inicialização: {}"
+
+msgctxt "Main"
+msgid "Essential"
+msgstr "Essencial"
+
+msgctxt "Main"
+msgid "All"
+msgstr "Todos"
+
+msgctxt "Main"
+msgid "Optional"
+msgstr "Opcional"
+
+msgctxt "Main"
+msgid "Disabled"
+msgstr "Desativado"
+
+msgctxt "Main"
+msgid "Restored"
+msgstr "Restaurado"
+
+msgctxt "Main"
+msgid "Command: {}"
+msgstr "Comando: {}"
+
+msgctxt "Main"
+msgid "Starts the same program as \"{}\""
+msgstr "Inicia o mesmo programa que \"{}\""
+
+msgctxt "Main"
+msgid "File: {}"
+msgstr "Arquivo: {}"
+
+msgctxt "Main"
+msgid "Disable at startup"
+msgstr "Desativar na inicialização"
+
+msgctxt "Main"
+msgid "Startup"
+msgstr "Inicialização"
+
+msgctxt "Main"
+msgid "History"
+msgstr "Histórico"
+
+msgctxt "Main"
+msgid "Could not apply the change: {}"
+msgstr "Não foi possível aplicar a mudança: {}"
+
+msgctxt "Main"
+msgid "Scan again"
+msgstr "Verificar de novo"
+
+msgctxt "Main"
+msgid "Apps that start when you log in. FastCheckup never changes the system files; it adds an override in your own folder."
+msgstr "Aplicativos que iniciam quando você entra. O FastCheckup nunca altera os arquivos do sistema; ele adiciona uma substituição na sua própria pasta."
+
+msgctxt "Main"
+msgid "No startup apps found."
+msgstr "Nenhum aplicativo de inicialização encontrado."
+
+msgctxt "Main"
+msgid "Nothing has been changed yet."
+msgstr "Nada foi alterado ainda."
+
+msgctxt "Main"
+msgid "{} UTC"
+msgstr "{} UTC"
+
+msgctxt "Main"
+msgid "Disable at startup: {}"
+msgstr "Desativar na inicialização: {}"
+
+msgctxt "Main"
+msgid "Writes this file with X-GNOME-Autostart-enabled=false: {}"
+msgstr "Grava este arquivo com X-GNOME-Autostart-enabled=false: {}"
+
+msgctxt "Main"
+msgid "Removes X-GNOME-Autostart-enabled=false from {}. If it then matches the system file, it is deleted."
+msgstr "Remove X-GNOME-Autostart-enabled=false de {}. Se depois ficar igual ao arquivo do sistema, ele é apagado."
+
+msgctxt "Main"
+msgid "Runs as your user. No password needed."
+msgstr "Executa como o seu usuário. Não pede senha."
+
+msgctxt "Main"
+msgid "Undo: press Enable on this row."
+msgstr "Desfazer: pressione Ativar nesta linha."
+
+msgctxt "Main"
+msgid "Undo: press Disable at startup on this row."
+msgstr "Desfazer: pressione Desativar na inicialização nesta linha."
+
+msgctxt "Main"
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgctxt "Main"
+msgid "Disable"
+msgstr "Desativar"
+
+msgctxt "Main"
+msgid "Services"
+msgstr "Serviços"
+
+msgctxt "Main"
+msgid "Search"
+msgstr "Buscar"
+
+msgctxt "Main"
+msgid "Working..."
+msgstr "Trabalhando..."
+
+msgctxt "Main"
+msgid "Disks"
+msgstr "Discos"
+
+msgctxt "Main"
+msgid "Other disk problems"
+msgstr "Outros problemas de disco"
+
+msgctxt "Main"
+msgid "{} failed to mount. Check that its disk or network share is connected."
+msgstr "{} falhou ao montar. Verifique se o disco ou compartilhamento de rede está conectado."
+
+msgctxt "Main"
+msgid "{} ({}) failed to mount at {}. Do not make it mount automatically; check the disk first."
+msgstr "{} ({}) falhou ao montar em {}. Não o torne automático; verifique o disco primeiro."
+
+msgctxt "Main"
+msgid "{} ({}) is not mounted. It is set up for {}."
+msgstr "{} ({}) não está montado. Está configurado para {}."
+
+msgctxt "Main"
+msgid "{} ({}) is mounted at {}."
+msgstr "{} ({}) está montado em {}."
+
+msgctxt "Main"
+msgid "{} ({}, {}, {})"
+msgstr "{} ({}, {}, {})"
+
+msgctxt "Main"
+msgid "NVMe SSD"
+msgstr "SSD NVMe"
+
+msgctxt "Main"
+msgid "USB drive"
+msgstr "Unidade USB"
+
+msgctxt "Main"
+msgid "hard drive"
+msgstr "HD"
+
+msgctxt "Main"
+msgid "SSD"
+msgstr "SSD"
+
+msgctxt "Main"
+msgid "Check health"
+msgstr "Verificar saúde"
+
+msgctxt "Main"
+msgid "Warning. The disk is showing early signs of wear or a bad cable. Back up your important files and check again in a few weeks."
+msgstr "Atenção. O disco mostra sinais iniciais de desgaste ou cabo ruim. Faça backup dos arquivos importantes e verifique de novo em algumas semanas."
+
+msgctxt "Main"
+msgid "Failing. Back up your files now and plan to replace this disk."
+msgstr "Falhando. Faça backup dos seus arquivos agora e planeje trocar este disco."
+
+msgctxt "Main"
+msgid "Details: worn {}%, spare {}%, media errors {}"
+msgstr "Detalhes: desgaste {}%, reserva {}%, erros de mídia {}"
+
+msgctxt "Main"
+msgid "Details: bad sectors moved {}, waiting {}, unreadable {}, cable errors {}"
+msgstr "Detalhes: setores ruins remapeados {}, aguardando {}, ilegíveis {}, erros de cabo {}"
+
+msgctxt "Main"
+msgid "{} failed to read or write data {} times. System message: {}"
+msgstr "{} falhou ao ler ou gravar dados {} vezes. Mensagem do sistema: {}"
+
+msgctxt "Main"
+msgid "A disk"
+msgstr "Um disco"
+
+msgctxt "Main"
+msgid "Checking health asks for your administrator password and needs the smartmontools package."
+msgstr "Verificar a saúde pede sua senha de administrador e precisa do pacote smartmontools."
+
+msgctxt "Main"
+msgid "{}. Worn {}%, spare {}%, media errors {}"
+msgstr "{}. Desgaste {}%, reserva {}%, erros de mídia {}"
+
+msgctxt "Main"
+msgid "Slow mount: x-systemd.automount in /etc/fstab mounts it on first use."
+msgstr "Montagem lenta: x-systemd.automount no /etc/fstab monta só no primeiro uso."
+
+msgctxt "Main"
+msgid "Disk health"
+msgstr "Saúde do disco"
+
+msgctxt "Main"
+msgid "A mount failed or the kernel reported disk errors. Check the disk before making any mount automatic."
+msgstr "Uma montagem falhou ou o kernel relatou erros de disco. Verifique o disco antes de tornar qualquer montagem automática."
+
+msgctxt "Main"
+msgid "Problems were found. If the data matters: back it up first, then check SMART, then repair or replace the disk. ddrescue can copy a failing disk; run it yourself, FastCheckup never does."
+msgstr "Foram encontrados problemas. Se os dados importam: faça backup primeiro, depois verifique o SMART, depois repare ou troque o disco. O ddrescue pode copiar um disco com falha; execute você mesmo, o FastCheckup nunca faz isso."
+
+msgctxt "Main"
+msgid "No disk errors seen since this boot. That does not prove a disk is healthy; SMART below is a better sign."
+msgstr "Nenhum erro de disco visto desde este boot. Isso não prova que o disco está saudável; o SMART abaixo é um sinal melhor."
+
+msgctxt "Main"
+msgid "Kernel disk errors"
+msgstr "Erros de disco do kernel"
+
+msgctxt "Main"
+msgid "Failed mounts"
+msgstr "Montagens com falha"
+
+msgctxt "Main"
+msgid "Unclean shutdowns"
+msgstr "Desligamentos incorretos"
+
+msgctxt "Main"
+msgid "Backup (Timeshift)"
+msgstr "Backup (Timeshift)"
+
+msgctxt "Main"
+msgid "Timeshift is not set up. Without a backup, a failing disk can take your system with it."
+msgstr "O Timeshift não está configurado. Sem backup, um disco com defeito pode levar o sistema junto."
+
+msgctxt "Main"
+msgid "Timeshift is set up, but no snapshot was found. The backup disk may not be connected."
+msgstr "O Timeshift está configurado, mas nenhum snapshot foi encontrado. O disco de backup pode não estar conectado."
+
+msgctxt "Main"
+msgid "Newest Timeshift snapshot: {}"
+msgstr "Snapshot mais recente do Timeshift: {}"
+
+msgctxt "Main"
+msgid "SMART"
+msgstr "SMART"
+
+msgctxt "Main"
+msgid "Reading SMART asks for your administrator password and needs the smartmontools package."
+msgstr "Ler o SMART pede sua senha de administrador e precisa do pacote smartmontools."
+
+msgctxt "Main"
+msgid "{} (x{}): {}"
+msgstr "{} (x{}): {}"
+
+msgctxt "Main"
+msgid "Check SMART"
+msgstr "Verificar SMART"
+
+msgctxt "Main"
+msgid "{}. Reallocated {}, pending {}, uncorrectable {}, CRC {}"
+msgstr "{}. Realocados {}, pendentes {}, incorrigíveis {}, CRC {}"
+
+msgctxt "Main"
+msgid "Passed"
+msgstr "Aprovado"
+
+msgctxt "Main"
+msgid "FAILED"
+msgstr "FALHOU"
+
+msgctxt "Main"
+msgid "Background programs that systemd starts at boot. Changing one asks for your administrator password. The time is how long it took to start, which is not always how long the boot waited for it."
+msgstr "Programas em segundo plano que o systemd inicia no boot. Alterar um pede a senha de administrador. O tempo é quanto ele levou para iniciar, nem sempre quanto o boot esperou por ele."
+
+msgctxt "Main"
+msgid "Part of the system. Disabling it may break your session."
+msgstr "Parte do sistema. Desativar pode quebrar sua sessão."
+
+msgctxt "Main"
+msgid "Starts at boot. Disabling it stops it from starting and, unless something depends on it, stops it now."
+msgstr "Inicia no boot. Desativar impede que inicie e, a menos que algo dependa dele, para-o agora."
+
+msgctxt "Main"
+msgid "Disabled. Enable starts it now and at every boot."
+msgstr "Desativado. Ativar o inicia agora e a cada boot."
+
+msgctxt "Main"
+msgid "Running now."
+msgstr "Em execução agora."
+
+msgctxt "Main"
+msgid "Runs from a timer after boot, so it does not slow down the boot."
+msgstr "Roda por um temporizador após o boot, então não deixa o boot mais lento."
+
+msgctxt "Main"
+msgid "Disable service: {}"
+msgstr "Desativar serviço: {}"
+
+msgctxt "Main"
+msgid "Enable service: {}"
+msgstr "Ativar serviço: {}"
+
+msgctxt "Main"
+msgid "Needs your administrator password."
+msgstr "Pede a sua senha de administrador."
+
+msgctxt "Main"
+msgid "Undo: press Disable on this row."
+msgstr "Desfazer: pressione Desativar nesta linha."
+
+msgctxt "Main"
+msgid "Disable only"
+msgstr "Só desativar"
+
+msgctxt "Main"
+msgid "ZFS pools exist on this computer. Disabling the ZFS services may stop them from mounting at boot."
+msgstr "Existem pools ZFS neste computador. Desativar os serviços ZFS pode impedir que sejam montados no boot."
+
+msgctxt "Main"
+msgid "No ZFS pools found (zpool list), so these services have nothing to manage."
+msgstr "Nenhum pool ZFS encontrado (zpool list), então estes serviços não têm o que gerenciar."
+
+msgctxt "Main"
+msgid "A touchpad or touchscreen was found. Touchegg is what gives it multi-finger gestures."
+msgstr "Um touchpad ou tela sensível ao toque foi encontrado. O Touchegg é o que fornece os gestos com vários dedos."
+
+msgctxt "Main"
+msgid "No touchpad or touchscreen was found, so Touchegg has nothing to do."
+msgstr "Nenhum touchpad ou tela sensível ao toque foi encontrado, então o Touchegg não tem o que fazer."
+
+msgctxt "Main"
+msgid "A modem or USB serial device was found. ModemManager manages it."
+msgstr "Um modem ou dispositivo serial USB foi encontrado. O ModemManager o gerencia."
+
+msgctxt "Main"
+msgid "No modem was found, so ModemManager has nothing to manage."
+msgstr "Nenhum modem foi encontrado, então o ModemManager não tem o que gerenciar."
+
+msgctxt "Main"
+msgid "Other services depend on it: {}. It will only be disabled for the next boot; it keeps running now."
+msgstr "Outros serviços dependem dele: {}. Ele só será desativado para o próximo boot; continua rodando agora."
+
+msgctxt "Main"
+msgid "Boot"
+msgstr "Boot"
+
+msgctxt "Main"
+msgid "Changed"
+msgstr "Alterado"
+
+msgctxt "Main"
+msgid "Firmware"
+msgstr "Firmware"
+
+msgctxt "Main"
+msgid "Boot loader"
+msgstr "Gerenciador de boot"
+
+msgctxt "Main"
+msgid "Kernel"
+msgstr "Kernel"
+
+msgctxt "Main"
+msgid "Initrd"
+msgstr "Initrd"
+
+msgctxt "Main"
+msgid "Userspace"
+msgstr "Espaço do usuário"
+
+msgctxt "Main"
+msgid "unknown"
+msgstr "desconhecido"
+
+msgctxt "Main"
+msgid "Total: {} s"
+msgstr "Total: {} s"
+
+msgctxt "Main"
+msgid "{}: {} s"
+msgstr "{}: {} s"
+
+msgctxt "Main"
+msgid "Firmware and the boot loader run before Linux starts; settings in your BIOS and the boot menu timeout affect them, nothing in the operating system does."
+msgstr "O firmware e o gerenciador de boot rodam antes do Linux iniciar; as configurações da BIOS e o tempo do menu de boot os afetam, nada no sistema operacional."
+
+msgctxt "Main"
+msgid "What the desktop waited for"
+msgstr "O que a área de trabalho esperou"
+
+msgctxt "Main"
+msgid "The critical chain: only these units delayed the desktop. The time on the Services page is how long a unit ran, which can be long without delaying anything."
+msgstr "A cadeia crítica: só estas unidades atrasaram a área de trabalho. O tempo na página Serviços é quanto uma unidade rodou, o que pode ser longo sem atrasar nada."
+
+msgctxt "Main"
+msgid "at {} s"
+msgstr "em {} s"
+
+msgctxt "Main"
+msgid "+ {} s"
+msgstr "+ {} s"
+
+msgctxt "Main"
+msgid "See in Services"
+msgstr "Ver em Serviços"
+
+msgctxt "Main"
+msgid "Boot menu"
+msgstr "Menu de boot"
+
+msgctxt "Main"
+msgid "Boot loader: {}. Firmware: {}."
+msgstr "Gerenciador de boot: {}. Firmware: {}."
+
+msgctxt "Main"
+msgid "GRUB_TIMEOUT is not set, so GRUB waits its default of 5 s."
+msgstr "GRUB_TIMEOUT não está definido, então o GRUB espera o padrão de 5 s."
+
+msgctxt "Main"
+msgid "GRUB_TIMEOUT is {} s."
+msgstr "GRUB_TIMEOUT é {} s."
+
+msgctxt "Main"
+msgid "Menu style: {}. Hiding the menu also hides the recovery entries."
+msgstr "Estilo do menu: {}. Ocultar o menu também oculta as entradas de recuperação."
+
+msgctxt "Main"
+msgid "Windows has its own UEFI boot entry, so a short GRUB timeout does not stop you from reaching it."
+msgstr "O Windows tem sua própria entrada de boot UEFI, então um tempo curto no GRUB não impede você de chegar a ele."
+
+msgctxt "Main"
+msgid "Also set in {} (in /etc/default/grub.d). FastCheckup edits only /etc/default/grub, so a change here may have no effect."
+msgstr "Também definido em {} (em /etc/default/grub.d). O FastCheckup edita só /etc/default/grub, então uma mudança aqui pode não ter efeito."
+
+msgctxt "Main"
+msgid "The timeout can only be changed here for GRUB."
+msgstr "O tempo só pode ser alterado aqui para o GRUB."
+
+msgctxt "Main"
+msgid "Already 1 s or less. Nothing to change."
+msgstr "Já é 1 s ou menos. Nada a alterar."
+
+msgctxt "Main"
+msgid "New timeout in seconds:"
+msgstr "Novo tempo em segundos:"
+
+msgctxt "Main"
+msgid "Set timeout"
+msgstr "Definir tempo"
+
+msgctxt "Main"
+msgid "Restore the last backup"
+msgstr "Restaurar o último backup"
+
+msgctxt "Main"
+msgid "BIOS / firmware checklist"
+msgstr "Lista de verificação da BIOS / firmware"
+
+msgctxt "Main"
+msgid "Linux cannot read these settings. Open your BIOS setup at power on and check them by hand. Board: {}"
+msgstr "O Linux não consegue ler estas configurações. Abra a BIOS ao ligar e confira à mão. Placa: {}"
+
+msgctxt "Main"
+msgid "Fast Boot: on."
+msgstr "Fast Boot: ligado."
+
+msgctxt "Main"
+msgid "Network / PXE boot ROM: off, if you never boot from the network."
+msgstr "ROM de boot de rede / PXE: desligada, se você nunca inicia pela rede."
+
+msgctxt "Main"
+msgid "CSM / legacy boot: off on a UEFI install."
+msgstr "CSM / boot legado: desligado em uma instalação UEFI."
+
+msgctxt "Main"
+msgid "Boot logo or full screen logo: off."
+msgstr "Logo de boot ou logo em tela cheia: desligado."
+
+msgctxt "Main"
+msgid "Boot order: the disk with your system first."
+msgstr "Ordem de boot: o disco com seu sistema primeiro."
+
+msgctxt "Main"
+msgid "Unused SATA, USB or onboard controllers: off."
+msgstr "Controladores SATA, USB ou onboard não usados: desligados."
+
+msgctxt "Main"
+msgid "Change the GRUB timeout to {} s"
+msgstr "Alterar o tempo do GRUB para {} s"
+
+msgctxt "Main"
+msgid "Restore the GRUB settings backup"
+msgstr "Restaurar o backup das configurações do GRUB"
+
+msgctxt "Main"
+msgid "Changes to /etc/default/grub:"
+msgstr "Alterações em /etc/default/grub:"
+
+msgctxt "Main"
+msgid "Commands that will run:"
+msgstr "Comandos que serão executados:"
+
+msgctxt "Main"
+msgid "A backup is made first. If anything fails, it is put back. Undo: Restore the last backup."
+msgstr "Um backup é feito antes. Se algo falhar, ele é restaurado. Desfazer: Restaurar o último backup."
+
+msgctxt "Main"
+msgid "This puts the file back as it was before the last change."
+msgstr "Isto devolve o arquivo como estava antes da última alteração."
+
+msgctxt "Main"
+msgid "Change"
+msgstr "Alterar"
+
+msgctxt "Main"
+msgid "Restore"
+msgstr "Restaurar"
+
+msgctxt "Main"
+msgid "Apps"
+msgstr "Aplicativos"
+
+msgctxt "Main"
+msgid "Removed"
+msgstr "Removido"
+
+msgctxt "Main"
+msgid "Remove unused Flatpak runtimes"
+msgstr "Remover runtimes Flatpak sem uso"
+
+msgctxt "Main"
+msgid "Programs installed from Debian packages, Flatpak and ~/AppImages. Removing one is always your choice, one at a time, and the size it frees is shown first."
+msgstr "Programas instalados por pacotes Debian, Flatpak e ~/AppImages. Remover é sempre uma escolha sua, um de cada vez, e o espaço liberado é mostrado antes."
+
+msgctxt "Main"
+msgid "{} MB"
+msgstr "{} MB"
+
+msgctxt "Main"
+msgid "Move to Trash"
+msgstr "Mover para a Lixeira"
+
+msgctxt "Main"
+msgid "Uninstall"
+msgstr "Desinstalar"
+
+msgctxt "Main"
+msgid "Remove"
+msgstr "Remover"
+
+msgctxt "Main"
+msgid "Part of the system. Removing it may break your session."
+msgstr "Parte do sistema. Removê-lo pode quebrar sua sessão."
+
+msgctxt "Main"
+msgid "Last data activity: unknown. It keeps no settings folder, so there is no way to tell if you use it."
+msgstr "Última atividade nos dados: desconhecida. Não há pasta de configurações, então não dá para saber se você usa."
+
+msgctxt "Main"
+msgid "Last data activity: {}. This is when its settings or data last changed, not proof of use."
+msgstr "Última atividade nos dados: {}. É quando suas configurações ou dados mudaram pela última vez, não prova de uso."
+
+msgctxt "Main"
+msgid "Last data activity: unknown"
+msgstr "Última atividade nos dados: desconhecida"
+
+msgctxt "Main"
+msgid "Last data activity: {}"
+msgstr "Última atividade nos dados: {}"
+
+msgctxt "Main"
+msgid "Its data has not changed for a long time. You may not use it any more."
+msgstr "Seus dados não mudam há muito tempo. Talvez você não use mais."
+
+msgctxt "Main"
+msgid "{} installed apps are {}. You may not need all of them."
+msgstr "{} aplicativos instalados são {}. Talvez você não precise de todos."
+
+msgctxt "Main"
+msgid "Installed automatically as a dependency of another package."
+msgstr "Instalado automaticamente como dependência de outro pacote."
+
+msgctxt "Main"
+msgid "web browsers"
+msgstr "navegadores"
+
+msgctxt "Main"
+msgid "text editors"
+msgstr "editores de texto"
+
+msgctxt "Main"
+msgid "video players"
+msgstr "players de vídeo"
+
+msgctxt "Main"
+msgid "audio players"
+msgstr "players de áudio"
+
+msgctxt "Main"
+msgid "system monitors"
+msgstr "monitores do sistema"
+
+msgctxt "Main"
+msgid "archive managers"
+msgstr "gerenciadores de arquivos compactados"
+
+msgctxt "Main"
+msgid "email clients"
+msgstr "clientes de e-mail"
+
+msgctxt "Main"
+msgid "file managers"
+msgstr "gerenciadores de arquivos"
+
+msgctxt "Main"
+msgid "terminals"
+msgstr "terminais"
+
+msgctxt "Main"
+msgid "chat apps"
+msgstr "aplicativos de chat"
+
+msgctxt "Main"
+msgid "It will also remove: {}"
+msgstr "Também removerá: {}"
+
+msgctxt "Main"
+msgid "Nothing installed needs these: {}"
+msgstr "Nenhum aplicativo instalado precisa destes: {}"
+
+msgctxt "Main"
+msgid "Move to the Trash: {}"
+msgstr "Mover para a Lixeira: {}"
+
+msgctxt "Main"
+msgid "Uninstall: {}"
+msgstr "Desinstalar: {}"
+
+msgctxt "Main"
+msgid "Startup entries of uninstalled apps"
+msgstr "Itens de inicialização de apps desinstalados"
+
+msgctxt "Main"
+msgid "The program is not installed: {}"
+msgstr "O programa não está instalado: {}"
+
+msgctxt "Main"
+msgid "Move the leftover data of {} to the Trash"
+msgstr "Mover os dados restantes de {} para a Lixeira"
+
+msgctxt "Main"
+msgid "Settings of apps that look uninstalled"
+msgstr "Configurações de aplicativos que parecem desinstalados"
+
+msgctxt "Main"
+msgid "Risky: this is only a guess from the folder name, so some of these still belong to an app you use (a plug-in, an app with another name, a portable program). Open the folder and check before you remove one. Removing a used one loses its settings and logins until you restore it from the Trash."
+msgstr "Arriscado: é só um palpite pelo nome da pasta, então algumas ainda pertencem a um aplicativo que você usa (um plug-in, um app com outro nome, um programa portátil). Abra a pasta e confira antes de remover. Remover uma em uso perde suas configurações e logins até você restaurá-la da Lixeira."
+
+msgctxt "Main"
+msgid "Only a guess that the app is gone. If you still use it, you lose its settings and logins until you restore the folder from the Trash."
+msgstr "É só um palpite de que o aplicativo foi removido. Se você ainda o usa, perde configurações e logins até restaurar a pasta da Lixeira."
+
+msgctxt "Main"
+msgid "Frees about {} KB."
+msgstr "Libera cerca de {} KB."
+
+msgctxt "Main"
+msgid "Frees about {} MB."
+msgstr "Libera cerca de {} MB."
+
+msgctxt "Main"
+msgid "Your settings in your home folder are kept. Install it again to undo."
+msgstr "Suas configurações na pasta pessoal são mantidas. Instale de novo para desfazer."
+
+msgctxt "Main"
+msgid "Runtimes are downloaded again when an app needs them."
+msgstr "Os runtimes são baixados de novo quando um aplicativo precisar."
+
+msgctxt "Main"
+msgid "Undo: restore it from the Trash."
+msgstr "Desfazer: restaure da Lixeira."
+
+msgctxt "Main"
+msgid "Leftovers"
+msgstr "Restos"
+
+msgctxt "Main"
+msgid "Things left behind by software that is gone or no longer needed, like what apt autoremove cleans. Each group is removed on its own, and what it frees is shown first."
+msgstr "Coisas deixadas por software que já saiu ou não é mais necessário, como o que o apt autoremove limpa. Cada grupo é removido separadamente e o espaço liberado é mostrado antes."
+
+msgctxt "Main"
+msgid "Packages nothing needs (apt autoremove)"
+msgstr "Pacotes que ninguém precisa (apt autoremove)"
+
+msgctxt "Main"
+msgid "Nothing to remove."
+msgstr "Nada para remover."
+
+msgctxt "Main"
+msgid "Remove ({} KB)"
+msgstr "Remover ({} KB)"
+
+msgctxt "Main"
+msgid "Remove ({} MB)"
+msgstr "Remover ({} MB)"
+
+msgctxt "Main"
+msgid "Settings of removed packages"
+msgstr "Configurações de pacotes removidos"
+
+msgctxt "Main"
+msgid "Unused Flatpak runtimes"
+msgstr "Runtimes Flatpak sem uso"
+
+msgctxt "Main"
+msgid "Nothing to remove. Every Flatpak runtime is used by an installed app."
+msgstr "Nada para remover. Todo runtime Flatpak é usado por um aplicativo instalado."
+
+msgctxt "Main"
+msgid "Data of uninstalled Flatpaks"
+msgstr "Dados de Flatpaks desinstalados"
+
+msgctxt "Main"
+msgid "Remove packages nothing needs"
+msgstr "Remover pacotes que ninguém precisa"
+
+msgctxt "Main"
+msgid "Delete the settings of removed packages"
+msgstr "Apagar as configurações de pacotes removidos"
+
+msgctxt "Main"
+msgid "Install a package again to undo. Packages you install by hand are never listed here."
+msgstr "Instale o pacote de novo para desfazer. Pacotes instalados por você nunca aparecem aqui."
+
+msgctxt "Main"
+msgid "These files in /etc cannot be restored. The packages are already gone."
+msgstr "Estes arquivos em /etc não podem ser restaurados. Os pacotes já foram removidos."
+
+msgctxt "Main"
+msgid "Delay changed"
+msgstr "Atraso alterado"
+
+msgctxt "Main"
+msgid "Running"
+msgstr "Em execução"
+
+msgctxt "Main"
+msgid "Start"
+msgstr "Iniciar"
+
+msgctxt "Main"
+msgid "Stop"
+msgstr "Parar"
+
+msgctxt "Main"
+msgid "Stopped"
+msgstr "Parado"
+
+msgctxt "Main"
+msgid "Old kernels"
+msgstr "Kernels antigos"
+
+msgctxt "Main"
+msgid "The kernel you are running and the newest one are always kept, so you can always boot. Only the others can be removed."
+msgstr "O kernel em uso e o mais novo são sempre mantidos, então você sempre consegue iniciar o sistema. Só os outros podem ser removidos."
+
+msgctxt "Main"
+msgid "Remove kernel {}"
+msgstr "Remover o kernel {}"
+
+msgctxt "Main"
+msgid "Install the kernel package again to undo. The boot menu is updated by apt."
+msgstr "Instale o pacote do kernel de novo para desfazer. O menu de boot é atualizado pelo apt."
+
+msgctxt "Main"
+msgid "Running now, kept"
+msgstr "Em uso, mantido"
+
+msgctxt "Main"
+msgid "Newest or fallback, kept"
+msgstr "Mais novo ou reserva, mantido"
+
+msgctxt "Main"
+msgid "Build output (target, node_modules)"
+msgstr "Resíduos de compilação (target, node_modules)"
+
+msgctxt "Main"
+msgid "Caches"
+msgstr "Caches"
+
+msgctxt "Main"
+msgid "Clear"
+msgstr "Limpar"
+
+msgctxt "Main"
+msgid "Clear the cache of {}"
+msgstr "Limpar o cache de {}"
+
+msgctxt "Main"
+msgid "Deleted log entries cannot be restored."
+msgstr "Entradas de log apagadas não podem ser restauradas."
+
+msgctxt "Main"
+msgid "Docker"
+msgstr "Docker"
+
+msgctxt "Main"
+msgid "Docker rebuilds the cache on the next image build. This cannot be undone."
+msgstr "O Docker recria o cache na próxima construção de imagem. Isso não pode ser desfeito."
+
+msgctxt "Main"
+msgid "Docker was not found, or you are not allowed to use it."
+msgstr "O Docker não foi encontrado, ou você não tem permissão para usá-lo."
+
+msgctxt "Main"
+msgid "Empty the Trash"
+msgstr "Esvaziar a Lixeira"
+
+msgctxt "Main"
+msgid "Found next to a Cargo.toml or package.json. They are moved to the Trash and rebuilt by the next build."
+msgstr "Encontrados ao lado de um Cargo.toml ou package.json. Vão para a Lixeira e são recriados na próxima compilação."
+
+msgctxt "Main"
+msgid "Installers and archives over 20 MB that have not changed for {} days."
+msgstr "Instaladores e arquivos compactados com mais de 20 MB que não mudam há {} dias."
+
+msgctxt "Main"
+msgid "Keep 100 MB"
+msgstr "Manter 100 MB"
+
+msgctxt "Main"
+msgid "Last change: {}"
+msgstr "Última alteração: {}"
+
+msgctxt "Main"
+msgid "Nothing found."
+msgstr "Nada encontrado."
+
+msgctxt "Main"
+msgid "Old installers in Downloads"
+msgstr "Instaladores antigos em Downloads"
+
+msgctxt "Main"
+msgid "Prune Docker stopped containers and untagged images"
+msgstr "Limpar contêineres parados e imagens sem tag do Docker"
+
+msgctxt "Main"
+msgid "Prune build cache"
+msgstr "Limpar cache de construção"
+
+msgctxt "Main"
+msgid "Prune stopped containers and untagged images"
+msgstr "Limpar contêineres parados e imagens sem tag"
+
+msgctxt "Main"
+msgid "Prune the Docker build cache"
+msgstr "Limpar o cache de construção do Docker"
+
+msgctxt "Main"
+msgid "Shrink the system journal"
+msgstr "Reduzir o journal do sistema"
+
+msgctxt "Main"
+msgid "Storage"
+msgstr "Armazenamento"
+
+msgctxt "Main"
+msgid "System journal"
+msgstr "Journal do sistema"
+
+msgctxt "Main"
+msgid "The Trash is empty."
+msgstr "A Lixeira está vazia."
+
+msgctxt "Main"
+msgid "The biggest folders in ~/.cache. Apps fill them again, so the space comes back over time. Clearing is permanent."
+msgstr "As maiores pastas em ~/.cache. Os aplicativos as enchem de novo, então o espaço volta com o tempo. Limpar é permanente."
+
+msgctxt "Main"
+msgid "The logs take {} MB. Nothing to shrink."
+msgstr "Os logs ocupam {} MB. Nada para reduzir."
+
+msgctxt "Main"
+msgid "The logs take {} MB. Older entries can be deleted, keeping the newest 100 MB."
+msgstr "Os logs ocupam {} MB. As entradas mais antigas podem ser apagadas, mantendo os 100 MB mais recentes."
+
+msgctxt "Main"
+msgid "This cannot be undone."
+msgstr "Isso não pode ser desfeito."
+
+msgctxt "Main"
+msgid "This cannot be undone. The app rebuilds its cache when it needs it."
+msgstr "Isso não pode ser desfeito. O aplicativo recria o cache quando precisar."
+
+msgctxt "Main"
+msgid "Trash"
+msgstr "Lixeira"
+
+msgctxt "Main"
+msgid "Volumes and images that have a tag are kept. Stopped containers are deleted, which cannot be undone."
+msgstr "Volumes e imagens com tag são mantidos. Contêineres parados são apagados, e isso não pode ser desfeito."
+
+msgctxt "Main"
+msgid "What takes space, sorted by how safe it is to remove. Safe and Almost safe can be cleaned together after you review the list and the commands; the rest is one item at a time. Your documents are never listed."
+msgstr "O que ocupa espaço, separado por quão seguro é remover. Seguro e Quase seguro podem ser limpos juntos depois que você revisa a lista e os comandos; o resto é um item por vez. Seus documentos nunca são listados."
+
+msgctxt "Main"
+msgid "{} items, {} MB. Check them in your file manager first: emptying cannot be undone."
+msgstr "{} itens, {} MB. Confira antes no gerenciador de arquivos: esvaziar não pode ser desfeito."
+
+msgctxt "Main"
+msgid "{}: {} in use, {} can be reclaimed"
+msgstr "{}: {} em uso, {} podem ser liberados"
+
+msgctxt "Main"
+msgid "Open folder"
+msgstr "Abrir pasta"
+
+msgctxt "Main"
+msgid "Disk usage"
+msgstr "Uso do disco"
+
+msgctxt "Main"
+msgid "{}: {} GB of {} GB used ({}%)"
+msgstr "{}: {} GB de {} GB usados ({}%)"
+
+msgctxt "Main"
+msgid "Biggest folders in your home"
+msgstr "Maiores pastas da sua pasta pessoal"
+
+msgctxt "Main"
+msgid "Only for information: your own files are never offered for removal. Open a folder to look inside."
+msgstr "Apenas informativo: seus próprios arquivos nunca são oferecidos para remoção. Abra uma pasta para ver o que há dentro."
+
+msgctxt "Main"
+msgid "Game libraries"
+msgstr "Bibliotecas de jogos"
+
+msgctxt "Main"
+msgid "Steam (all libraries), Heroic and Bottles. Only for information: uninstall a game from its launcher."
+msgstr "Steam (todas as bibliotecas), Heroic e Bottles. Apenas informativo: desinstale um jogo pelo próprio launcher."
+
+msgctxt "Main"
+msgid "Old tool versions"
+msgstr "Versões antigas de ferramentas"
+
+msgctxt "Main"
+msgid "Versions of a tool. The 2 newest and any Proton or Steam tool a game is set to use are kept; only the others can go to the Trash. Official Proton from Steam is removed in Steam (Library, Tools)."
+msgstr "Versões de uma ferramenta. As 2 mais novas e qualquer Proton ou ferramenta do Steam que um jogo use são mantidas; só as outras podem ir para a Lixeira. O Proton oficial do Steam se remove no Steam (Biblioteca, Ferramentas)."
+
+msgctxt "Main"
+msgid "Newest, kept"
+msgstr "Mais nova, mantida"
+
+msgctxt "Main"
+msgid "Used by a game, kept"
+msgstr "Usada por um jogo, mantida"
+
+msgctxt "Main"
+msgid "Managed by Steam"
+msgstr "Gerenciada pelo Steam"
+
+msgctxt "Main"
+msgid "Steam default, kept"
+msgstr "Padrão do Steam, mantida"
+
+msgctxt "Main"
+msgid "Used by: {}"
+msgstr "Usada por: {}"
+
+msgctxt "Main"
+msgid "Biggest files in your home"
+msgstr "Maiores arquivos da sua pasta pessoal"
+
+msgctxt "Main"
+msgid "Files of 100 MB or more, biggest first. Only for information."
+msgstr "Arquivos de 100 MB ou mais, os maiores primeiro. Apenas informativo."
+
+msgctxt "Main"
+msgid "Security"
+msgstr "Segurança"
+
+msgctxt "Main"
+msgid "Firewall rules"
+msgstr "Regras do firewall"
+
+msgctxt "Main"
+msgid "Reading the rules asks for your administrator password and needs the ufw package. It only reads; nothing is changed."
+msgstr "Ler as regras pede sua senha de administrador e precisa do pacote ufw. Apenas lê; nada é alterado."
+
+msgctxt "Main"
+msgid "Check firewall rules"
+msgstr "Verificar regras do firewall"
+
+msgctxt "Main"
+msgid "Information only: nothing here is changed or removed. Without administrator rights some things stay hidden, so this can miss problems."
+msgstr "Apenas informativo: nada aqui é alterado ou removido. Sem direitos de administrador algumas coisas ficam ocultas, então isto pode deixar passar problemas."
+
+msgctxt "Main"
+msgid "Nothing visible looks wrong. That is not a guarantee that the system is clean."
+msgstr "Nada visível parece errado. Isso não garante que o sistema esteja limpo."
+
+msgctxt "Main"
+msgid "Scanners you can run"
+msgstr "Verificadores que você pode executar"
+
+msgctxt "Main"
+msgid "FastCheckup does not include these. Run them yourself in a terminal."
+msgstr "O FastCheckup não inclui estes. Execute você mesmo em um terminal."
+
+msgctxt "Main"
+msgid "{} (installed)"
+msgstr "{} (instalado)"
+
+msgctxt "Main"
+msgid "{} is open to the network on: {}"
+msgstr "{} está aberto para a rede em: {}"
+
+msgctxt "Main"
+msgid "Open to the network on: {} (program unknown: it belongs to another user)"
+msgstr "Aberto para a rede em: {} (programa desconhecido: pertence a outro usuário)"
+
+msgctxt "Main"
+msgid "Anyone on your network can try to connect to the open ports listed here."
+msgstr "Qualquer pessoa na sua rede pode tentar se conectar às portas abertas listadas aqui."
+
+msgctxt "Main"
+msgid "{} has {} connections to other computers, e.g. {}"
+msgstr "{} tem {} conexões com outros computadores, p. ex. {}"
+
+msgctxt "Main"
+msgid "{} has 1 connection to another computer, e.g. {}"
+msgstr "{} tem 1 conexão com outro computador, p. ex. {}"
+
+msgctxt "Main"
+msgid "Open to the network on: {}"
+msgstr "Aberto para a rede em: {}"
+
+msgctxt "Main"
+msgid "1 connection to another computer, e.g. {}"
+msgstr "1 conexão com outro computador, p. ex. {}"
+
+msgctxt "Main"
+msgid "{} connections to other computers, e.g. {}"
+msgstr "{} conexões com outros computadores, p. ex. {}"
+
+msgctxt "Main"
+msgid "A program"
+msgstr "Um programa"
+
+msgctxt "Main"
+msgid "{} runs from {} ({} processes). Programs normally run from system folders."
+msgstr "{} executa de {} ({} processos). Programas normalmente executam de pastas do sistema."
+
+msgctxt "Main"
+msgid "{} is loaded into every program through ld.so.preload. Rootkits use this."
+msgstr "{} é carregado em todos os programas pelo ld.so.preload. Rootkits usam isso."
+
+msgctxt "Main"
+msgid "Scheduled job (cron): {}"
+msgstr "Tarefa agendada (cron): {}"
+
+msgctxt "Main"
+msgid "Your user runs a systemd unit of its own: {}"
+msgstr "Seu usuário executa uma unidade systemd própria: {}"
+
+msgctxt "Main"
+msgid "{} lists {} keys that can log in to this account over SSH. Check you know each one."
+msgstr "{} lista {} chaves que podem entrar nesta conta por SSH. Confira se você conhece cada uma."
+
+msgctxt "Main"
+msgid "{} changed in the last 30 days and has {} lines that download or decode things, e.g. {}"
+msgstr "{} mudou nos últimos 30 dias e tem {} linhas que baixam ou decodificam coisas, p. ex. {}"
+
+msgctxt "Main"
+msgid "can read or change a lot: {}"
+msgstr "pode ler ou alterar muita coisa: {}"
+
+msgctxt "Main"
+msgid "{} failed login attempts in the last 24 hours."
+msgstr "{} tentativas de login falhas nas últimas 24 horas."
+
+msgctxt "Main"
+msgid "The firewall (ufw) is {}. Rules were not read; that needs administrator rights."
+msgstr "O firewall (ufw) está {}. As regras não foram lidas; isso exige direitos de administrador."
+
+msgctxt "Main"
+msgid "Hide"
+msgstr "Ocultar"
+
+msgctxt "Main"
+msgid "Admin checks"
+msgstr "Verificações de administrador"
+
+msgctxt "Main"
+msgid "Without the administrator password some checks see less: programs and ports of other users, firewall rules, disk health and Timeshift snapshots. One password prompt runs them all; the app stays under your account."
+msgstr "Sem a senha de administrador algumas verificações enxergam menos: programas e portas de outros usuários, regras do firewall, saúde dos discos e snapshots do Timeshift. Um único pedido de senha executa todas; o aplicativo continua na sua conta."
+
+msgctxt "Main"
+msgid "Run admin checks"
+msgstr "Executar verificações de administrador"
+
+msgctxt "Main"
+msgid "Show"
+msgstr "Mostrar"
+
+msgctxt "Main"
+msgid "in the Trash"
+msgstr "na Lixeira"
+
+msgctxt "Main"
+msgid "of system logs"
+msgstr "de logs do sistema"
+
+msgctxt "Main"
+msgid "build folders and caches"
+msgstr "pastas de build e caches"
+
+msgctxt "Main"
+msgid "{} of {} GB, {}%"
+msgstr "{} de {} GB, {}%"
+
+msgctxt "Main"
+msgid "packages and runtimes can free"
+msgstr "pacotes e runtimes podem liberar"
+
+msgctxt "Main"
+msgid "kernels installed"
+msgstr "kernels instalados"
+
+msgctxt "Main"
+msgid "leftover app files"
+msgstr "arquivos restantes de apps"
+
+msgctxt "Main"
+msgid "{} KB"
+msgstr "{} KB"
+
+msgctxt "Main"
+msgid "disks"
+msgstr "discos"
+
+msgctxt "Main"
+msgid "Problems"
+msgstr "Problemas"
+
+msgctxt "Main"
+msgid "No errors"
+msgstr "Sem erros"
+
+msgctxt "Main"
+msgid "seen since this boot"
+msgstr "vistos desde este boot"
+
+msgctxt "Main"
+msgid "Not checked"
+msgstr "Não verificado"
+
+msgctxt "Main"
+msgid "Healthy"
+msgstr "Saudável"
+
+msgctxt "Main"
+msgid "Warning"
+msgstr "Atenção"
+
+msgctxt "Main"
+msgid "Failing"
+msgstr "Falhando"
+
+msgctxt "Main"
+msgid "suspicious"
+msgstr "suspeitos"
+
+msgctxt "Main"
+msgid "worth a look"
+msgstr "para conferir"
+
+msgctxt "Main"
+msgid "information"
+msgstr "informativos"
+
+msgctxt "Main"
+msgid "Suspicious"
+msgstr "Suspeito"
+
+msgctxt "Main"
+msgid "Worth a look"
+msgstr "Conferir"
+
+msgctxt "Main"
+msgid "Info"
+msgstr "Info"
+
+msgctxt "Main"
+msgid "Findings"
+msgstr "Achados"
+
+msgctxt "Main"
+msgid "Overview"
+msgstr "Visão geral"
+
+msgctxt "Main"
+msgid "{} worth a look"
+msgstr "{} para conferir"
+
+msgctxt "Main"
+msgid "Sort by"
+msgstr "Ordenar por"
+
+msgctxt "Main"
+msgid "Size"
+msgstr "Tamanho"
+
+msgctxt "Main"
+msgid "Name"
+msgstr "Nome"
+
+msgctxt "Main"
+msgid "Date"
+msgstr "Data"
+
+msgctxt "Main"
+msgid "Network"
+msgstr "Rede"
+
+msgctxt "Main"
+msgid "Programs running"
+msgstr "Programas em execução"
+
+msgctxt "Main"
+msgid "Starts by itself"
+msgstr "Inicia sozinho"
+
+msgctxt "Main"
+msgid "Accounts and logins"
+msgstr "Contas e logins"
+
+msgctxt "Main"
+msgid "Browser add-ons"
+msgstr "Extensões do navegador"
+
+msgctxt "Main"
+msgid "Updates"
+msgstr "Atualizações"
+
+msgctxt "Main"
+msgid "Duplicate files"
+msgstr "Arquivos duplicados"
+
+msgctxt "Main"
+msgid "Files of 1 MB or more with exactly the same content in your home. The oldest is kept as the original; a copy is checked byte by byte again before it goes to the Trash."
+msgstr "Arquivos de 1 MB ou mais com exatamente o mesmo conteúdo na sua pasta pessoal. O mais antigo fica como original; uma cópia é conferida byte a byte de novo antes de ir para a Lixeira."
+
+msgctxt "Main"
+msgid "Find duplicates"
+msgstr "Procurar duplicados"
+
+msgctxt "Main"
+msgid "No duplicate files found."
+msgstr "Nenhum arquivo duplicado encontrado."
+
+msgctxt "Main"
+msgid "Move the duplicate to the Trash"
+msgstr "Mover o duplicado para a Lixeira"
+
+msgctxt "Main"
+msgid "Original, kept"
+msgstr "Original, mantido"
+
+msgctxt "Main"
+msgid "System snapshots (Timeshift)"
+msgstr "Snapshots do sistema (Timeshift)"
+
+msgctxt "Main"
+msgid "{} snapshots, the oldest from {}. They can take a lot of space; open Timeshift to see their size and delete old ones."
+msgstr "{} snapshots, o mais antigo de {}. Podem ocupar muito espaço; abra o Timeshift para ver o tamanho e apagar os antigos."
+
+msgctxt "Main"
+msgid "Timeshift is set up, but its snapshots could not be listed without administrator rights. Open Timeshift to see them."
+msgstr "O Timeshift está configurado, mas os snapshots não puderam ser listados sem direitos de administrador. Abra o Timeshift para vê-los."
+
+msgctxt "Main"
+msgid "Scanned just now"
+msgstr "Verificado agora há pouco"
+
+msgctxt "Main"
+msgid "Scanned {} min ago"
+msgstr "Verificado há {} min"
+
+msgctxt "Main"
+msgid "Scanned {} h ago"
+msgstr "Verificado há {} h"
+
+msgctxt "Main"
+msgid "Downloaded package files"
+msgstr "Arquivos de pacotes baixados"
+
+msgctxt "Main"
+msgid "Copies of installed packages that APT keeps. Safe to remove; APT downloads them again if needed."
+msgstr "Cópias de pacotes instalados que o APT guarda. Pode remover; o APT baixa de novo se precisar."
+
+msgctxt "Main"
+msgid "APT keeps {} MB of downloaded packages. Nothing to clean."
+msgstr "O APT guarda {} MB de pacotes baixados. Nada para limpar."
+
+msgctxt "Main"
+msgid "Clean"
+msgstr "Limpar"
+
+msgctxt "Main"
+msgid "Delete downloaded package files"
+msgstr "Apagar os arquivos de pacotes baixados"
+
+msgctxt "Main"
+msgid "Restart needed to finish updating: {}"
+msgstr "É preciso reiniciar para concluir a atualização: {}"
+
+msgctxt "Main"
+msgid "Restart needed to finish updating."
+msgstr "É preciso reiniciar para concluir a atualização."
+
+msgctxt "Main"
+msgid "The running kernel {} is no longer installed. Restart to use the new one."
+msgstr "O kernel em uso ({}) não está mais instalado. Reinicie para usar o novo."
+
+msgctxt "Main"
+msgid "{} updates waiting, {} of them security updates (as of the last package list refresh)"
+msgstr "{} atualizações aguardando, {} delas de segurança (conforme a última atualização da lista de pacotes)"
+
+msgctxt "Main"
+msgid "{} updates waiting (as of the last package list refresh)"
+msgstr "{} atualizações aguardando (conforme a última atualização da lista de pacotes)"
+
+msgctxt "Main"
+msgid "Packages held back from updates: {}"
+msgstr "Pacotes retidos e fora das atualizações: {}"
+
+msgctxt "Main"
+msgid "Needs attention"
+msgstr "Precisa de atenção"
+
+msgctxt "Main"
+msgid "Cannot reach the host: only this sandbox is inspected, so the results below are not your system."
+msgstr "Sem acesso ao sistema: só este sandbox é inspecionado, então os resultados abaixo não são do seu sistema."
+
+msgctxt "Main"
+msgid "Space and Safety are checked the first time you open them."
+msgstr "Espaço e Segurança são verificados na primeira vez que você os abre."
+
+msgctxt "Main"
+msgid "Disk errors"
+msgstr "Erros de disco"
+
+msgctxt "Main"
+msgid "Disk errors were seen since this boot."
+msgstr "Erros de disco foram vistos desde este boot."
+
+msgctxt "Main"
+msgid "Open disk health"
+msgstr "Abrir saúde do disco"
+
+msgctxt "Main"
+msgid "{} suspicious items were found on this computer."
+msgstr "{} itens suspeitos foram encontrados neste computador."
+
+msgctxt "Main"
+msgid "Open security"
+msgstr "Abrir segurança"
+
+msgctxt "Main"
+msgid "{}% full"
+msgstr "{}% cheio"
+
+msgctxt "Main"
+msgid "A disk is almost full."
+msgstr "Um disco está quase cheio."
+
+msgctxt "Main"
+msgid "Open storage"
+msgstr "Abrir armazenamento"
+
+msgctxt "Main"
+msgid "Free space"
+msgstr "Liberar espaço"
+
+msgctxt "Main"
+msgid "{} can be freed."
+msgstr "{} podem ser liberados."
+
+msgctxt "Main"
+msgid "{} can be freed"
+msgstr "{} podem ser liberados"
+
+msgctxt "Main"
+msgid "{} GB"
+msgstr "{} GB"
+
+msgctxt "Main"
+msgid "Open space"
+msgstr "Abrir espaço"
+
+msgctxt "Main"
+msgid "Nothing needs attention."
+msgstr "Nada precisa de atenção."
+
+msgctxt "Main"
+msgid "Space"
+msgstr "Espaço"
+
+msgctxt "Main"
+msgid "Safety"
+msgstr "Segurança"
+
+msgctxt "Main"
+msgid "Speed"
+msgstr "Velocidade"
+
+msgctxt "Main"
+msgid "Fullest disk: {}%"
+msgstr "Disco mais cheio: {}%"
+
+msgctxt "Main"
+msgid "Not checked yet"
+msgstr "Ainda não verificado"
+
+msgctxt "Main"
+msgid "Open"
+msgstr "Abrir"
+
+msgctxt "Main"
+msgid "Back to {}"
+msgstr "Voltar para {}"
+
+msgctxt "Main"
+msgid "No problems seen"
+msgstr "Nenhum problema visto"
+
+msgctxt "Main"
+msgid "Show fewer"
+msgstr "Mostrar menos"
+
+msgctxt "Main"
+msgid "Clean up"
+msgstr "Limpar"
+
+msgctxt "Main"
+msgid "Look only"
+msgstr "Só olhar"
+
+msgctxt "Main"
+msgid "Show partitions ({})"
+msgstr "Mostrar partições ({})"
+
+msgctxt "Main"
+msgid "Hide partitions"
+msgstr "Ocultar partições"
+
+msgctxt "Main"
+msgid "Show {} more disks"
+msgstr "Mostrar mais {} discos"
+
+msgctxt "Main"
+msgid "Show {} more"
+msgstr "Mostrar mais {}"
+
+msgctxt "Main"
+msgid "Source"
+msgstr "Origem"
+
+msgctxt "Main"
+msgid "Kind"
+msgstr "Tipo"
+
+msgctxt "Main"
+msgid "Status"
+msgstr "Estado"
+
+msgctxt "Main"
+msgid "Activity"
+msgstr "Atividade"
+
+msgctxt "Main"
+msgid "{} suspicious"
+msgstr "{} suspeitos"
+
+msgctxt "Main"
+msgid "Disk errors seen"
+msgstr "Erros de disco vistos"
+
+msgctxt "Main"
+msgid "No disk errors seen"
+msgstr "Nenhum erro de disco visto"
+
+msgctxt "Main"
+msgid "Open safety"
+msgstr "Abrir segurança"
+
+msgctxt "Main"
+msgid "Open speed"
+msgstr "Abrir velocidade"
+
+msgctxt "Main"
+msgid "last boot"
+msgstr "último boot"
+
+msgctxt "Main"
+msgid "{}%"
+msgstr "{}%"
+
+msgctxt "Main"
+msgid "can be freed"
+msgstr "podem ser liberados"
+
+msgctxt "Main"
+msgid "fullest disk"
+msgstr "disco mais cheio"
+
+msgctxt "Main"
+msgid "All disks and folders"
+msgstr "Todos os discos e pastas"
+
+msgctxt "Main"
+msgid "Easy wins"
+msgstr "Ganhos fáceis"
+
+msgctxt "Main"
+msgid "Things that can be rebuilt or downloaded again."
+msgstr "Coisas que podem ser recriadas ou baixadas de novo."
+
+msgctxt "Main"
+msgid "Review in Storage"
+msgstr "Revisar em Armazenamento"
+
+msgctxt "Main"
+msgid "From software that is gone or no longer needed."
+msgstr "De programas que já foram removidos ou não são mais necessários."
+
+msgctxt "Main"
+msgid "Review leftovers"
+msgstr "Revisar restos"
+
+msgctxt "Main"
+msgid "Worst first."
+msgstr "Os piores primeiro."
+
+msgctxt "Main"
+msgid "See all findings"
+msgstr "Ver todos os achados"
+
+msgctxt "Main"
+msgid "startup entries"
+msgstr "entradas de inicialização"
+
+msgctxt "Main"
+msgid "services"
+msgstr "serviços"
+
+msgctxt "Main"
+msgid "Where the boot time goes"
+msgstr "Para onde vai o tempo do boot"
+
+msgctxt "Main"
+msgid "Open boot"
+msgstr "Abrir boot"
+
+msgctxt "Main"
+msgid "Apps that start when you log in."
+msgstr "Aplicativos que iniciam quando você entra."
+
+msgctxt "Main"
+msgid "Review startup apps"
+msgstr "Revisar aplicativos de inicialização"
+
+msgctxt "Main"
+msgid "Programs the system starts in the background."
+msgstr "Programas que o sistema inicia em segundo plano."
+
+msgctxt "Main"
+msgid "Review services"
+msgstr "Revisar serviços"
+
+msgctxt "Main"
+msgid "Right now"
+msgstr "Agora"
+
+msgctxt "Main"
+msgid "Fine"
+msgstr "Tudo certo"
+
+msgctxt "Main"
+msgid "Problem"
+msgstr "Problema"
+
+msgctxt "Main"
+msgid "Refresh"
+msgstr "Atualizar"
+
+msgctxt "Main"
+msgid "Measuring…"
+msgstr "Medindo…"
+
+msgctxt "Main"
+msgid "Short of memory."
+msgstr "Pouca memória disponível."
+
+msgctxt "Main"
+msgid "The processor is busy."
+msgstr "O processador está ocupado."
+
+msgctxt "Main"
+msgid "The disk is slow to respond."
+msgstr "O disco está demorando para responder."
+
+msgctxt "Main"
+msgid "Running smoothly."
+msgstr "Funcionando bem."
+
+msgctxt "Main"
+msgid "memory, {} of {} used"
+msgstr "memória, {} de {} em uso"
+
+msgctxt "Main"
+msgid "swap, {} of {} used"
+msgstr "swap, {} de {} em uso"
+
+msgctxt "Main"
+msgid "load, {} cores"
+msgstr "carga, {} núcleos"
+
+msgctxt "Main"
+msgid "Up {} min"
+msgstr "Ligado há {} min"
+
+msgctxt "Main"
+msgid "Up {} h"
+msgstr "Ligado há {} h"
+
+msgctxt "Main"
+msgid "Up {} d"
+msgstr "Ligado há {} d"
+
+msgctxt "Main"
+msgid "Nothing is using much right now."
+msgstr "Nada está usando muito agora."
+
+msgctxt "Main"
+msgid "CPU is a share of the whole computer, not of one core."
+msgstr "A CPU é a parte do computador inteiro, não de um núcleo."
+
+msgctxt "Main"
+msgid "System"
+msgstr "Sistema"
+
+msgctxt "Main"
+msgid "Copy all"
+msgstr "Copiar tudo"
+
+msgctxt "Main"
+msgid "BIOS"
+msgstr "BIOS"
+
+msgctxt "Main"
+msgid "Motherboard"
+msgstr "Placa-mãe"
+
+msgctxt "Main"
+msgid "Graphics"
+msgstr "Gráficos"
+
+msgctxt "Main"
+msgid "Hardware acceleration"
+msgstr "Aceleração de hardware"
+
+msgctxt "Main"
+msgid "USB devices"
+msgstr "Dispositivos USB"
+
+msgctxt "Main"
+msgid "Monitors"
+msgstr "Monitores"
+
+msgctxt "Main"
+msgid "Audio"
+msgstr "Áudio"
+
+msgctxt "Main"
+msgid "Computer"
+msgstr "Computador"
+
+msgctxt "Main"
+msgid "Operating system"
+msgstr "Sistema operacional"
+
+msgctxt "Main"
+msgid "Linux kernel"
+msgstr "Kernel do Linux"
+
+msgctxt "Main"
+msgid "Processor"
+msgstr "Processador"
+
+msgctxt "Main"
+msgid "Memory"
+msgstr "Memória"
+
+msgctxt "Main"
+msgid "Desktop environment"
+msgstr "Ambiente de trabalho"
+
+msgctxt "Main"
+msgid "Display server"
+msgstr "Servidor gráfico"
+
+msgctxt "Main"
+msgid "Brand"
+msgstr "Marca"
+
+msgctxt "Main"
+msgid "Version"
+msgstr "Versão"
+
+msgctxt "Main"
+msgid "Preferences"
+msgstr "Preferências"
+
+msgctxt "Main"
+msgid "Appearance"
+msgstr "Aparência"
+
+msgctxt "Main"
+msgid "Light"
+msgstr "Claro"
+
+msgctxt "Main"
+msgid "Dark"
+msgstr "Escuro"
+
+msgctxt "Main"
+msgid "Language"
+msgstr "Idioma"
+
+msgctxt "Main"
+msgid "System default"
+msgstr "Padrão do sistema"
+
+msgctxt "Main"
+msgid "About"
+msgstr "Sobre"
+
+msgctxt "Main"
+msgid "Close"
+msgstr "Fechar"
+
+msgctxt "Main"
+msgid "Dismiss"
+msgstr "Dispensar"
+
+msgctxt "AboutCard"
+msgid "Version {}"
+msgstr "Versão {}"
+
+msgctxt "AboutCard"
+msgid "Author: {}"
+msgstr "Autor: {}"
+
+msgctxt "AboutCard"
+msgid "License: {}"
+msgstr "Licença: {}"
+
+msgctxt "AboutCard"
+msgid "Close"
+msgstr "Fechar"
+
+msgctxt "Main"
+msgid "A light and fast Linux system inspector. It shows what is slow, large, unused or exposed, and you act on each item yourself."
+msgstr "Um inspetor de sistema Linux leve e rápido. Mostra o que está lento, grande, sem uso ou exposto, e você age em cada item por conta própria."
+
+msgctxt "Main"
+msgid "Release"
+msgstr "Lançamento"
+
+msgctxt "Main"
+msgid "Release date"
+msgstr "Data de lançamento"
+
+msgctxt "Main"
+msgid "Boot mode"
+msgstr "Modo de boot"
+
+msgctxt "Main"
+msgid "Secure Boot"
+msgstr "Secure Boot"
+
+msgctxt "Main"
+msgid "PCI ID"
+msgstr "ID PCI"
+
+msgctxt "Main"
+msgid "Driver"
+msgstr "Driver"
+
+msgctxt "Main"
+msgid "Driver version"
+msgstr "Versão do driver"
+
+msgctxt "Main"
+msgid "OpenGL"
+msgstr "OpenGL"
+
+msgctxt "Main"
+msgid "OpenGL ES"
+msgstr "OpenGL ES"
+
+msgctxt "Main"
+msgid "Vulkan"
+msgstr "Vulkan"
+
+msgctxt "Main"
+msgid "Video decoding (VA-API)"
+msgstr "Decodificação de vídeo (VA-API)"
+
+msgctxt "Main"
+msgid "Video decoding (VDPAU)"
+msgstr "Decodificação de vídeo (VDPAU)"
+
+msgctxt "Main"
+msgid "{} cores, {} threads"
+msgstr "{} núcleos, {} threads"
+
+msgctxt "Main"
+msgid "{} cores, {} threads, up to {} GHz"
+msgstr "{} núcleos, {} threads, até {} GHz"
+
+msgctxt "Main"
+msgid "UEFI"
+msgstr "UEFI"
+
+msgctxt "Main"
+msgid "Legacy BIOS"
+msgstr "BIOS legada"
+
+msgctxt "Main"
+msgid "Unknown"
+msgstr "Desconhecido"
+
+msgctxt "Main"
+msgid "Enabled ({})"
+msgstr "Ativado ({})"
+
+msgctxt "Main"
+msgid "Not available"
+msgstr "Indisponível"
+
+msgctxt "Main"
+msgid "Not available ({})"
+msgstr "Indisponível ({})"
+
+msgctxt "Main"
+msgid "Not checked: install the {} package"
+msgstr "Não verificado: instale o pacote {}"
+
+msgctxt "Main"
+msgid "Included in the kernel"
+msgstr "Incluído no kernel"
+
+msgctxt "Main"
+msgid "{}: {} at {} Hz"
+msgstr "{}: {} a {} Hz"
+
+msgctxt "Main"
+msgid "{} ({}, {})"
+msgstr "{} ({}, {})"
+
+msgctxt "Main"
+msgid "{} ({})"
+msgstr "{} ({})"
+
+msgctxt "Main"
+msgid "None found"
+msgstr "Nenhum encontrado"
+
+msgctxt "Main"
+msgid "Hostname"
+msgstr "Nome do computador"
+
+msgctxt "Main"
+msgid "Uptime"
+msgstr "Tempo ligado"
+
+msgctxt "Main"
+msgid "Swap"
+msgstr "Swap"
+
+msgctxt "Main"
+msgid "Video memory"
+msgstr "Memória de vídeo"
+
+msgctxt "Main"
+msgid "{} min"
+msgstr "{} min"
+
+msgctxt "Main"
+msgid "{} h {} min"
+msgstr "{} h {} min"
+
+msgctxt "Main"
+msgid "{} d {} h {} min"
+msgstr "{} d {} h {} min"
+
+msgctxt "Main"
+msgid "Not configured"
+msgstr "Não configurado"
+
+msgctxt "Main"
+msgid "Memory safety net"
+msgstr "Proteção contra falta de memória"
+
+msgctxt "Main"
+msgid "Swap and zram: what they are"
+msgstr "Swap e zram: o que são"
+
+msgctxt "Main"
+msgid "Swap is space the computer uses when memory is full: it moves pages that are not in use out of memory so the rest keeps running. With none, a spike in memory use can freeze the whole desktop until a program is killed."
+msgstr "Swap é o espaço que o computador usa quando a memória enche: ele tira da memória as páginas que não estão em uso para o resto continuar funcionando. Sem swap, um pico de uso de memória pode travar a área de trabalho inteira até que um programa seja encerrado."
+
+msgctxt "Main"
+msgid "Traditional swap (a file or partition on the disk) is large and cheap, and is needed to hibernate. But the disk is much slower than memory, so a computer that leans on it feels slow, and it adds writes to an SSD."
+msgstr "O swap tradicional (um arquivo ou partição no disco) é grande e barato, e é necessário para hibernar. Mas o disco é muito mais lento que a memória, então um computador que depende dele fica lento, e isso acrescenta gravações em um SSD."
+
+msgctxt "Main"
+msgid "zram swap lives in memory and keeps the pages compressed, usually 2 to 3 times smaller. It is fast, uses no disk and wears nothing, but it takes real memory and cannot be used to hibernate. It suits computers with 8 GB or more that only need a buffer for spikes."
+msgstr "O swap em zram fica na memória e guarda as páginas comprimidas, em geral de 2 a 3 vezes menores. É rápido, não usa o disco e não desgasta nada, mas ocupa memória de verdade e não serve para hibernar. Combina com computadores de 8 GB ou mais que só precisam de uma reserva para picos."
+
+msgctxt "Main"
+msgid "You can use both: zram first, with a small disk swap behind it for hibernation or very large loads. Neither fixes a program that never stops growing; that is what a low-memory watcher (earlyoom) is for."
+msgstr "Dá para usar os dois: zram primeiro, com um swap pequeno em disco atrás dele para hibernação ou cargas muito grandes. Nenhum dos dois resolve um programa que nunca para de crescer; para isso existe um vigia de pouca memória (earlyoom)."
+
+msgctxt "Main"
+msgid "Swap is set up ({})."
+msgstr "O swap está configurado ({})."
+
+msgctxt "Main"
+msgid "No swap is set up."
+msgstr "Não há swap configurado."
+
+msgctxt "Main"
+msgid "{} is running and will stop a program that uses all the memory."
+msgstr "{} está em execução e vai encerrar um programa que use toda a memória."
+
+msgctxt "Main"
+msgid "Nothing is watching for low memory (systemd-oomd or earlyoom)."
+msgstr "Nada está vigiando a falta de memória (systemd-oomd ou earlyoom)."
+
+msgctxt "Main"
+msgid "The kernel killed {} programs for lack of memory since the previous boot."
+msgstr "O kernel encerrou {} programas por falta de memória desde o boot anterior."
+
+msgctxt "Main"
+msgid "Without swap or a watcher, the computer can freeze for minutes when memory runs out. To add a watcher, run: {}"
+msgstr "Sem swap nem vigia, o computador pode travar por minutos quando a memória acaba. Para adicionar um vigia, execute: {}"
+
+msgctxt "Main"
+msgid "What are the boot phases?"
+msgstr "Quais são as fases do boot?"
+
+msgctxt "Main"
+msgid "A boot has four phases. Firmware (BIOS or UEFI) starts the hardware. The boot loader (GRUB) picks the system to start. The kernel starts Linux and the initrd finds your disk. Userspace then starts the services and the desktop."
+msgstr "O boot tem quatro fases. O firmware (BIOS ou UEFI) liga o hardware. O gerenciador de boot (GRUB) escolhe o sistema a iniciar. O kernel inicia o Linux e o initrd encontra o seu disco. Depois o espaço do usuário inicia os serviços e a área de trabalho."
+
+msgctxt "Main"
+msgid "The critical chain is the line of units that each had to wait for the one before it. Only those delay the desktop; other units start at the same time and cost nothing."
+msgstr "A cadeia crítica é a sequência de unidades em que cada uma teve de esperar a anterior. Só elas atrasam a área de trabalho; as outras iniciam ao mesmo tempo e não custam nada."
+
+msgctxt "Main"
+msgid "What is SMART?"
+msgstr "O que é SMART?"
+
+msgctxt "Main"
+msgid "SMART is a self-report that most disks keep about their own wear. It only reports; it repairs nothing."
+msgstr "SMART é um autorrelatório que a maioria dos discos mantém sobre o próprio desgaste. Ele só informa; não conserta nada."
+
+msgctxt "Main"
+msgid "Reallocated and pending sectors are places the disk could not read reliably. A few that never change are usually fine. A number that keeps growing means the disk is failing: back up first, then replace it."
+msgstr "Setores realocados e pendentes são lugares que o disco não conseguiu ler com segurança. Poucos que nunca mudam costumam ser normais. Um número que não para de crescer indica que o disco está falhando: faça backup primeiro e depois troque-o."
+
+msgctxt "Main"
+msgid "What is an open port?"
+msgstr "O que é uma porta aberta?"
+
+msgctxt "Main"
+msgid "A port is a numbered door that a program opens so others can talk to it. \"Listening\" means the program is waiting for a connection."
+msgstr "Uma porta é uma entrada numerada que um programa abre para que outros falem com ele. \"Escutando\" significa que o programa está esperando uma conexão."
+
+msgctxt "Main"
+msgid "127.0.0.1 can only be reached from this computer. 0.0.0.0 or :: can be reached from the network. Look closer when a program you do not know listens on 0.0.0.0, or when there is no firewall."
+msgstr "127.0.0.1 só pode ser acessado a partir deste computador. 0.0.0.0 ou :: pode ser acessado pela rede. Olhe com mais atenção quando um programa desconhecido escutar em 0.0.0.0 ou quando não houver firewall."
+
+msgctxt "Main"
+msgid "What are these?"
+msgstr "O que são estes itens?"
+
+msgctxt "Main"
+msgid "Packages nothing needs (apt autoremove): packages that were installed only to support another program that is now gone."
+msgstr "Pacotes que nada usa (apt autoremove): pacotes instalados só para dar suporte a outro programa que não existe mais."
+
+msgctxt "Main"
+msgid "Settings of removed packages: the program was removed but its configuration files stayed behind."
+msgstr "Configurações de pacotes removidos: o programa foi removido, mas seus arquivos de configuração ficaram."
+
+msgctxt "Main"
+msgid "Unused Flatpak runtimes: shared libraries that no installed Flatpak app needs any more. They are downloaded again if an app asks for them."
+msgstr "Runtimes Flatpak sem uso: bibliotecas compartilhadas que nenhum app Flatpak instalado precisa mais. São baixadas de novo se um app pedir."
+
+msgctxt "Main"
+msgid "Kernel limits"
+msgstr "Limites do kernel"
+
+msgctxt "Main"
+msgid "File watches"
+msgstr "Monitores de arquivos"
+
+msgctxt "Main"
+msgid "Memory maps"
+msgstr "Mapas de memória"
+
+msgctxt "Main"
+msgid "{}: too low for {}, which may stop watching your folders. To raise it, run: {}"
+msgstr "{}: baixo demais para {}, que pode parar de monitorar suas pastas. Para aumentar, execute: {}"
+
+msgctxt "Main"
+msgid "{}: too low for some games, which may crash on start. To raise it, run: {}"
+msgstr "{}: baixo demais para alguns jogos, que podem travar ao abrir. Para aumentar, execute: {}"
+
+msgctxt "Main"
+msgid "Safe"
+msgstr "Seguro"
+
+msgctxt "Main"
+msgid "Almost safe"
+msgstr "Quase seguro"
+
+msgctxt "Main"
+msgid "Must analyze"
+msgstr "Analisar"
+
+msgctxt "Main"
+msgid "Safe to remove"
+msgstr "Seguro para remover"
+
+msgctxt "Main"
+msgid "Caches, downloaded package files, old logs and Docker's build cache: the system or the app makes them again when needed. Unused Flatpak runtimes and packages nothing needs (see Leftovers) are included."
+msgstr "Caches, pacotes baixados, logs antigos e o cache de construção do Docker: o sistema ou o app os recria quando precisa. Runtimes Flatpak sem uso e pacotes que nada usa (veja Restos) estão incluídos."
+
+msgctxt "Main"
+msgid "Review and clean up..."
+msgstr "Revisar e limpar..."
+
+msgctxt "Main"
+msgid "Docker build cache"
+msgstr "Cache de construção do Docker"
+
+msgctxt "Main"
+msgid "Docker rebuilds it on the next image build. Containers and images are in Must analyze."
+msgstr "O Docker o recria na próxima construção de imagem. Contêineres e imagens estão em Analisar."
+
+msgctxt "Main"
+msgid "Build folders, installers and Trash entries older than {} days (change it in Preferences), and old tool versions (all but the newest 2). Most go to the Trash, so you can restore them; old Trash entries are deleted for good."
+msgstr "Pastas de build, instaladores e itens da Lixeira com mais de {} dias (mude em Preferências), e versões antigas de ferramentas (todas menos as 2 mais novas). A maioria vai para a Lixeira, e dá para restaurar; itens antigos da Lixeira são apagados de vez."
+
+msgctxt "Main"
+msgid "Old build output (target, node_modules)"
+msgstr "Saída de build antiga (target, node_modules)"
+
+msgctxt "Main"
+msgid "Found next to a Cargo.toml or package.json and not changed for {} days. They are moved to the Trash and rebuilt by the next build."
+msgstr "Encontradas ao lado de um Cargo.toml ou package.json e sem mudanças há {} dias. Vão para a Lixeira e são recriadas no próximo build."
+
+msgctxt "Main"
+msgid "Old Trash entries"
+msgstr "Itens antigos da Lixeira"
+
+msgctxt "Main"
+msgid "Entries of your Trash deleted more than {} days ago. Only the Trash in your home folder is covered. They are deleted for good, so they are removed only by the review above, and only when emptying the Trash is allowed in Preferences."
+msgstr "Itens da sua Lixeira apagados há mais de {} dias. Só a Lixeira da sua pasta pessoal é considerada. São apagados de vez, por isso só saem pela revisão acima, e só quando esvaziar a Lixeira está permitido nas Preferências."
+
+msgctxt "Main"
+msgid "Allow emptying the Trash (cannot be undone)"
+msgstr "Permitir esvaziar a Lixeira (não pode ser desfeito)"
+
+msgctxt "Main"
+msgid "Emptying the Trash is off, so you can still restore what was cleaned. Turn it on in Preferences to enable it."
+msgstr "Esvaziar a Lixeira está desligado, assim você ainda pode restaurar o que foi limpo. Ative nas Preferências."
+
+msgctxt "Main"
+msgid "Recent build output (target, node_modules)"
+msgstr "Saída de build recente (target, node_modules)"
+
+msgctxt "Main"
+msgid "Build folders changed in the last {} days: you may be working on them. They are moved to the Trash and rebuilt by the next build."
+msgstr "Pastas de build alteradas nos últimos {} dias: você pode estar trabalhando nelas. Vão para a Lixeira e são recriadas no próximo build."
+
+msgctxt "Main"
+msgid "Deleted: {}"
+msgstr "Apagado: {}"
+
+msgctxt "Main"
+msgid "Cache: {}"
+msgstr "Cache: {}"
+
+msgctxt "Main"
+msgid "Build folder: {}"
+msgstr "Pasta de build: {}"
+
+msgctxt "Main"
+msgid "Installer: {}"
+msgstr "Instalador: {}"
+
+msgctxt "Main"
+msgid "Old tool version: {}"
+msgstr "Versão antiga de ferramenta: {}"
+
+msgctxt "Main"
+msgid "Trash entry: {}"
+msgstr "Item da Lixeira: {}"
+
+msgctxt "Main"
+msgid "Packages nothing needs"
+msgstr "Pacotes que nada usa"
+
+msgctxt "Main"
+msgid "System journal, keeping the newest 100 MB"
+msgstr "Diário do sistema, mantendo os 100 MB mais recentes"
+
+msgctxt "Main"
+msgid "Clean up what is safe"
+msgstr "Limpar o que é seguro"
+
+msgctxt "Main"
+msgid "Clean up what is almost safe"
+msgstr "Limpar o que é quase seguro"
+
+msgctxt "Main"
+msgid "Caches, package files and logs are deleted for good; they come back when needed. Untick what you want to keep."
+msgstr "Caches, pacotes e logs são apagados de vez; voltam quando preciso. Desmarque o que quiser manter."
+
+msgctxt "Main"
+msgid "Build folders, installers and Trash entries older than {} days, and old tool versions (all but the newest 2). Build folders, installers and tool versions go to the Trash, so you can restore them. Old Trash entries are deleted for good. Untick what you want to keep."
+msgstr "Pastas de build, instaladores e itens da Lixeira com mais de {} dias, e versões antigas de ferramentas (todas menos as 2 mais novas). Pastas de build, instaladores e versões de ferramentas vão para a Lixeira, e dá para restaurar. Itens antigos da Lixeira são apagados de vez. Desmarque o que quiser manter."
+
+msgctxt "Main"
+msgid "Nothing to clean up here."
+msgstr "Nada para limpar aqui."
+
+msgctxt "Main"
+msgid "Frees about {} MB ({} items)."
+msgstr "Libera cerca de {} MB ({} itens)."
+
+msgctxt "Main"
+msgid "Needs your administrator password once."
+msgstr "Pede a senha de administrador uma vez."
+
+msgctxt "Main"
+msgid "Flatpak may ask for the password on its own."
+msgstr "O Flatpak pode pedir a senha por conta própria."
+
+msgctxt "Main"
+msgid "Show commands"
+msgstr "Mostrar comandos"
+
+msgctxt "Main"
+msgid "Hide commands"
+msgstr "Ocultar comandos"
+
+msgctxt "Main"
+msgid "Almost safe means older than (days)"
+msgstr "Quase seguro significa mais antigo que (dias)"
+
+msgctxt "Main"
+msgid "What takes space and what software left behind, sorted by how safe it is to remove. Safe and Almost safe can be cleaned together after you review the list and the commands; the rest is one item at a time. Your documents are never listed."
+msgstr "O que ocupa espaço e o que os programas deixaram para trás, separado por quão seguro é remover. Seguro e Quase seguro podem ser limpos juntos depois que você revisa a lista e os comandos; o resto é um item por vez. Seus documentos nunca são listados."
+
+msgctxt "Main"
+msgid "Caches, downloaded package files, old logs, Docker's build cache, unused Flatpak runtimes and packages nothing needs: the system or the app makes them again when needed, or nothing uses them any more. The review lists every package before anything runs."
+msgstr "Caches, pacotes baixados, logs antigos, o cache de construção do Docker, runtimes Flatpak sem uso e pacotes que nada usa: o sistema ou o app os recria quando precisa, ou nada mais os usa. A revisão lista cada pacote antes de qualquer coisa rodar."
+
+msgctxt "Main"
+msgid "Read the list first: a package you use directly can be in it if it was only ever installed as a dependency."
+msgstr "Leia a lista antes: um pacote que você usa diretamente pode estar nela se só foi instalado como dependência."
+
+msgctxt "Main"
+msgid "The program was removed but its configuration files stayed behind."
+msgstr "O programa foi removido, mas seus arquivos de configuração ficaram."
+
+msgctxt "Main"
+msgid "Packages nothing needs ({} packages)"
+msgstr "Pacotes que nada usa ({} pacotes)"
+
+msgctxt "Main"
+msgid "safe to clean"
+msgstr "seguro para limpar"
+
+msgctxt "Main"
+msgid "almost safe to clean"
+msgstr "quase seguro para limpar"

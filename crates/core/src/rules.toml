@@ -1,0 +1,29 @@
+# Protected startup entries (file name without .desktop, lowercase). A trailing * matches a prefix.
+# Linux Mint / Cinnamon seed from the plan; other desktops get their own lists later.
+essential = [
+  "cinnamon*", "nm-applet", "wpa_supplicant", "pipewire*", "wireplumber", "pulseaudio", "polkit*",
+  "gnome-keyring*", "gpg-agent", "xdg-user-dirs*", "xapp-sn-watcher", "systemd*", "udisks*",
+  "power-profiles-daemon", "mintupdate", "mintreport", "mintsources", "mintdrivers", "mintupgrade",
+  "mintinstall", "timeshift*", "gufw", "system-config-printer*", "nvidia*", "im-launch", "at-spi-dbus-bus",
+]
+
+# Protected services (unit name without .service, lowercase). A trailing * matches a prefix.
+essential_services = [
+  "dbus*", "networkmanager*", "systemd-*", "polkit*", "udisks2", "lightdm", "gdm*", "sddm", "accounts-daemon",
+  "wpa_supplicant", "cron", "rsyslog", "apparmor", "ufw", "upower", "rtkit-daemon",
+  "user@*", "getty@*", "console-setup", "keyboard-setup", "alsa-*", "pulseaudio", "pipewire*", "wireplumber",
+  "power-profiles-daemon", "thermald", "irqbalance", "unattended-upgrades",
+]
+
+# Background jobs started by timers: they run after boot and are not a boot cost.
+timer_services = [
+  "apt-daily", "apt-daily-upgrade", "fwupd-refresh", "fstrim", "man-db", "logrotate", "e2scrub_all", "motd-news",
+  "update-notifier-download", "update-notifier-motd", "ua-timer", "dpkg-db-backup", "systemd-tmpfiles-clean",
+]
+
+# Protected applications (package name or launcher file name without .desktop, lowercase). A trailing * matches a prefix.
+essential_apps = [
+  "nemo*", "cinnamon*", "mintinstall", "mint*", "synaptic", "software-properties*", "gufw", "timeshift*",
+  "system-config-printer*", "nvidia-settings", "gnome-terminal", "xterm", "network-manager*",
+  "blueman*", "pavucontrol", "xed", "xviewer", "xreader", "xplayer", "gnome-system-monitor", "gnome-calculator",
+]

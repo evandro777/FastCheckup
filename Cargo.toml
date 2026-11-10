@@ -1,0 +1,25 @@
+[workspace]
+members = ["crates/core", "crates/app"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/evandro777/FastCheckup"
+rust-version = "1.92"
+publish = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+panic = "abort"
+strip = true
+opt-level = 3
+
+# Quick iteration: `cargo build --profile fast` (no LTO, parallel codegen).
+[profile.fast]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true

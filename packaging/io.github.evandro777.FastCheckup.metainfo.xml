@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.evandro777.FastCheckup</id>
+  <name>FastCheckup</name>
+  <summary>Inspect your Linux system and act on each finding</summary>
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer id="io.github.evandro777">
+    <name translatable="no">evandro777</name>
+  </developer>
+  <url type="homepage">https://github.com/evandro777/FastCheckup</url>
+  <description>
+    <p>FastCheckup lists what starts when you log in and lets you disable or restore each entry. It never changes system files, asks before every change and keeps a history. More checks are planned.</p>
+  </description>
+  <launchable type="desktop-id">io.github.evandro777.FastCheckup.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-01-01">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

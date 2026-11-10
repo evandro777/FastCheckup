@@ -1,0 +1,20 @@
+{
+  "enabledPlugins": {
+    "slint@slint": true,
+    "frontend-design@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "slint": {
+      "source": {
+        "source": "github",
+        "repo": "slint-ui/ai-plugins"
+      }
+    },
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    }
+  }
+}

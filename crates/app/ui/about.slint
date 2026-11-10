@@ -1,0 +1,57 @@
+// Family kit v4, part 2: the About card and the Preferences row shared by all Fast apps (see FastHello's
+// docs/UI-STYLE.md).
+// Copied verbatim into every app, next to family.slint. Change FastHello's copy, bump the version and copy it to the
+// others. Each app keeps its own overlay shell and puts these inside it.
+import { Button } from "std-widgets.slint";
+import { Family } from "family.slint";
+
+// The content of every About dialog, so all six show the same lines in the same order. The app passes its own icon,
+// name, version, one-sentence description and address (without "https://"). Author and license are the same everywhere.
+export component AboutCard inherits VerticalLayout {
+    in property <image> icon;
+    in property <string> name;
+    in property <string> version;
+    in property <string> description;
+    // e.g. "github.com/evandro777/FastPaste"; `link-clicked` gets it with "https://" in front.
+    in property <string> url;
+    callback link-clicked(string);
+    callback close();
+    spacing: Family.gap-l;
+    alignment: start;
+
+    HorizontalLayout {
+        alignment: center;
+        Image {
+            source: root.icon;
+            width: 64px;
+            height: 64px;
+        }
+    }
+    Text { text: root.name; font-size: Family.page-title; font-weight: Family.page-weight; horizontal-alignment: center; }
+    Text { text: @tr("Version {}", root.version); horizontal-alignment: center; }
+    Text { text: root.description; wrap: word-wrap; min-width: 0px; horizontal-alignment: center; }
+    Text { text: @tr("Author: {}", "evandro777"); horizontal-alignment: center; }
+    Text { text: @tr("License: {}", "GPL-3.0-or-later"); horizontal-alignment: center; }
+    Text {
+        text: root.url;
+        color: Family.info;
+        horizontal-alignment: center;
+        TouchArea {
+            mouse-cursor: pointer;
+            clicked => { root.link-clicked("https://" + root.url); }
+        }
+    }
+    HorizontalLayout {
+        alignment: end;
+        Button { text: @tr("Close"); primary: true; clicked => { root.close(); } }
+    }
+}
+
+// One line of Preferences: the label on the left, the control on the right. Give the control
+// `width: Family.control-width` (a switch or a row of swatches keeps its own size).
+export component PrefRow inherits HorizontalLayout {
+    in property <string> label;
+    spacing: Family.gap-l;
+    Text { text: root.label; vertical-alignment: center; horizontal-stretch: 1; wrap: word-wrap; min-width: 0px; }
+    @children
+}

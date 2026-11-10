@@ -1,0 +1,33 @@
+[package]
+name = "fastcheckup"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Light and fast Linux app built in Rust with Slint."
+
+[dependencies]
+fastcheckup-core = { path = "../core" }
+slint = { version = "1.18", default-features = false, features = ["std", "backend-winit", "renderer-software", "software-renderer-systemfonts", "compat-1-2", "image-default-formats", "unstable-winit-030"] }
+
+[build-dependencies]
+slint-build = "1.18"
+
+# `cargo deb -p fastcheckup` (CI builds it on the oldest runner, so the glibc requirement stays low).
+[package.metadata.deb]
+name = "fastcheckup"
+section = "utils"
+priority = "optional"
+extended-description = "Inspects startup apps and services, and lets you act on each one individually."
+depends = "libfontconfig1, libxkbcommon0, libxkbcommon-x11-0, libx11-6, libxcb1"
+recommends = "polkitd | policykit-1"
+assets = [
+  ["target/release/fastcheckup", "usr/bin/", "755"],
+  ["../../packaging/io.github.evandro777.FastCheckup.desktop", "usr/share/applications/", "644"],
+  ["../../packaging/io.github.evandro777.FastCheckup.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+  ["../../packaging/io.github.evandro777.FastCheckup.metainfo.xml", "usr/share/metainfo/", "644"],
+  ["../../packaging/io.github.evandro777.FastCheckup.policy", "usr/share/polkit-1/actions/", "644"],
+  ["ui/icons/LICENSE", "usr/share/doc/fastcheckup/LICENSE.lucide", "644"],
+]

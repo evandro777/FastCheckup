@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FastCheckup</title>
+<meta name="description" content="A light and fast Linux system inspector, written in Rust: what is slow, large, unused or exposed, and a button for each finding.">
+<meta property="og:title" content="FastCheckup">
+<meta property="og:description" content="A light and fast Linux system inspector, written in Rust: what is slow, large, unused or exposed, and a button for each finding.">
+<style>
+  :root { --bg:#fff; --fg:#1d1d20; --muted:#5f6368; --card:#f4f5f7; --accent:#0b7d3c; --border:#dadce0; --warn:#fff4d6; --warn-fg:#5c4400; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17181a; --fg:#ececee; --muted:#9aa0a6; --card:#222427; --accent:#4cc38a; --border:#34373b; --warn:#33290d; --warn-fg:#f0d98a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 0 16px 64px; }
+  header { padding: 56px 0 16px; text-align: center; }
+  h1 { font-size: 2.6rem; margin: 0; }
+  .tag { color: var(--muted); font-size: 1.15rem; margin: 8px 0 0; }
+  h2 { margin-top: 48px; }
+  a { color: var(--accent); }
+  .callout { background:var(--warn); color:var(--warn-fg); border-radius:10px; padding:10px 16px; margin:20px 0 0; text-align:center; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:12px; }
+  .card { background:var(--card); border-radius:10px; padding:14px 16px; }
+  .card b { display:block; color:var(--accent); }
+  .card span { color:var(--muted); font-size:.92rem; }
+  pre { background:var(--card); padding:14px; border-radius:10px; overflow-x:auto; font-size:.9rem; }
+  small, .note { color:var(--muted); }
+  @media (max-width: 640px) { h1 { font-size: 2.1rem; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>FastCheckup</h1>
+    <p class="tag">A light and fast system inspector: what is slow, large, unused or exposed, and a button for each finding.</p>
+    <p><a href="https://github.com/evandro777/FastCheckup">GitHub</a> ·
+       <a href="https://github.com/evandro777/FastCheckup/releases">Releases</a></p>
+    <p class="callout"><b>Early version.</b> Tested on Linux Mint Cinnamon. The Flatpak is not sandboxed: it relaunches itself on the host, because an inspector inside a sandbox would only see its own files and programs.</p>
+  </header>
+
+  <h2>What it does</h2>
+  <p>Written in Rust with Slint, software rendering only, no async runtime. It reports; you act on each item one at a time (there is no "fix all").</p>
+  <div class="grid">
+    <div class="card"><b>Speed</b><span>Startup entries, services and the boot breakdown, and what is using CPU and memory right now.</span></div>
+    <div class="card"><b>Space</b><span>Caches, build folders, old installers, the journal, Docker, the Trash and leftovers of removed software, sorted by how safe they are to clean.</span></div>
+    <div class="card"><b>Safety</b><span>Disk health, open ports, persistence files, browser add-ons and failed logins. Report only.</span></div>
+    <div class="card"><b>Apps</b><span>Installed Debian, Flatpak and AppImage apps with size and last use; uninstall one.</span></div>
+  </div>
+
+  <h2>Install with Flatpak (updates itself)</h2>
+  <p>This remote keeps FastCheckup updated with <code>flatpak update</code> and your software centre:</p>
+<pre>flatpak remote-add --system --if-not-exists fastcheckup https://evandro777.github.io/FastCheckup/fastcheckup.flatpakrepo
+flatpak install --system fastcheckup io.github.evandro777.FastCheckup</pre>
+  <p><small>Use <code>--system</code>: Linux Mint's Update Manager only looks at system-wide Flatpaks. The runtime comes from
+     Flathub. The remote is GPG-signed, but the key lives in the
+     <a href="https://github.com/evandro777/FastCheckup">source repository</a>, so it is only as trustworthy as that.</small></p>
+
+  <h2>Or the AppImage or the .deb</h2>
+  <p>Download <code>FastCheckup-&lt;version&gt;-x86_64.AppImage</code> or the <code>.deb</code> from the
+     <a href="https://github.com/evandro777/FastCheckup/releases/latest">latest release</a>. The AppImage uses the fontconfig,
+     xkbcommon and X11 libraries already on your system.</p>
+  <p class="note">Run one of them, not several: they use different data folders.</p>
+
+  <h2>License</h2>
+  <p>GPL-3.0-or-later. See the <a href="https://github.com/evandro777/FastCheckup">repository</a>.</p>
+</main>
+</body>
+</html>

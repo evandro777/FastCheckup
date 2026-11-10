@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>FastCheckup</vendor>
+  <vendor_url>https://github.com/evandro777/FastCheckup</vendor_url>
+
+  <!-- FastCheckup runs fixed system commands through pkexec; there is no root helper binary. These actions only make
+       the password prompt say what is being done. -->
+  <action id="io.github.evandro777.FastCheckup.service-disable">
+    <description>Disable a system service</description>
+    <message>Authentication is required to disable a system service</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/systemctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">disable</annotate>
+  </action>
+
+  <action id="io.github.evandro777.FastCheckup.service-enable">
+    <description>Enable a system service</description>
+    <message>Authentication is required to enable a system service</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/systemctl</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">enable</annotate>
+  </action>
+
+  <action id="io.github.evandro777.FastCheckup.apps-remove">
+    <description>Uninstall an application</description>
+    <message>Authentication is required to uninstall an application</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/apt-get</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">remove</annotate>
+  </action>
+
+  <action id="io.github.evandro777.FastCheckup.apps-autoremove">
+    <description>Remove packages nothing needs</description>
+    <message>Authentication is required to change installed packages</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/apt-get</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">autoremove</annotate>
+  </action>
+
+  <action id="io.github.evandro777.FastCheckup.apps-purge">
+    <description>Delete the settings of removed packages</description>
+    <message>Authentication is required to change installed packages</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/apt-get</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">purge</annotate>
+  </action>
+
+  <action id="io.github.evandro777.FastCheckup.firewall-status">
+    <description>Read the firewall rules</description>
+    <message>Authentication is required to read the firewall rules</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/sbin/ufw</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">status</annotate>
+  </action>
+
+  <!-- The GRUB timeout is changed by one `pkexec /bin/sh -c` script (backup, edit, check, update-grub), so it has no
+       action of its own: the generic prompt of `/bin/sh` applies, like the Overview admin scan. -->
+</policyconfig>
