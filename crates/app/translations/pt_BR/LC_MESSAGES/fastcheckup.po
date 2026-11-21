@@ -264,6 +264,10 @@ msgid "Failed mounts"
 msgstr "Montagens com falha"
 
 msgctxt "Main"
+msgid "The kernel log could not be read in time, so disk errors may be missing. Scan again."
+msgstr "Não foi possível ler o log do kernel a tempo, então erros de disco podem estar faltando. Verifique de novo."
+
+msgctxt "Main"
 msgid "Unclean shutdowns"
 msgstr "Desligamentos incorretos"
 
@@ -572,8 +576,16 @@ msgid "Remove unused Flatpak runtimes"
 msgstr "Remover runtimes Flatpak sem uso"
 
 msgctxt "Main"
-msgid "Programs installed from Debian packages, Flatpak and ~/AppImages. Removing one is always your choice, one at a time, and the size it frees is shown first."
-msgstr "Programas instalados por pacotes Debian, Flatpak e ~/AppImages. Remover é sempre uma escolha sua, um de cada vez, e o espaço liberado é mostrado antes."
+msgid "Programs installed from Debian packages, Flatpak and ~/AppImages, plus launchers no package owns. Removing one is always your choice, one at a time, and the size it frees is shown first."
+msgstr "Programas instalados por pacotes Debian, Flatpak e ~/AppImages, mais atalhos que nenhum pacote possui. Remover é sempre uma escolha sua, um de cada vez, e o espaço liberado é mostrado antes."
+
+msgctxt "Main"
+msgid "Other"
+msgstr "Outros"
+
+msgctxt "Main"
+msgid "Not installed from a package or Flatpak. Use its own uninstaller to remove it."
+msgstr "Não foi instalado por um pacote ou Flatpak. Use o desinstalador do próprio programa para removê-lo."
 
 msgctxt "Main"
 msgid "{} MB"
@@ -796,6 +808,58 @@ msgid "Stop"
 msgstr "Parar"
 
 msgctxt "Main"
+msgid "Search the web"
+msgstr "Pesquisar na web"
+
+msgctxt "Main"
+msgid "Documentation"
+msgstr "Documentação"
+
+msgctxt "Main"
+msgid "Copy command"
+msgstr "Copiar comando"
+
+msgctxt "Main"
+msgid "Copied"
+msgstr "Copiado"
+
+msgctxt "Main"
+msgid "Held back the desktop for {} s at the last boot."
+msgstr "Atrasou a área de trabalho em {} s no último boot."
+
+msgctxt "Main"
+msgid "Failed the last time it ran."
+msgstr "Falhou na última vez em que rodou."
+
+msgctxt "Main"
+msgid "Restarted {} times since boot."
+msgstr "Reiniciou {} vezes desde o boot."
+
+msgctxt "Main"
+msgid "Started on demand by {}: disabling it may not keep it from starting."
+msgstr "Iniciado sob demanda por {}: desativá-lo pode não impedir que inicie."
+
+msgctxt "Main"
+msgid "Uses {} of memory and has used {} s of CPU."
+msgstr "Usa {} de memória e já usou {} s de CPU."
+
+msgctxt "Main"
+msgid "Old-style startup script in /etc/init.d, usually added by a vendor's installer."
+msgstr "Script de inicialização antigo em /etc/init.d, geralmente adicionado pelo instalador de um fabricante."
+
+msgctxt "Main"
+msgid "From the {} package."
+msgstr "Do pacote {}."
+
+msgctxt "Main"
+msgid "Not from a package: added by a vendor's installer or by hand."
+msgstr "Não vem de um pacote: adicionado pelo instalador de um fabricante ou à mão."
+
+msgctxt "Main"
+msgid "Manual: man {}"
+msgstr "Manual: man {}"
+
+msgctxt "Main"
 msgid "Stopped"
 msgstr "Parado"
 
@@ -840,6 +904,90 @@ msgid "Clear the cache of {}"
 msgstr "Limpar o cache de {}"
 
 msgctxt "Main"
+msgid "Python caches"
+msgstr "Caches do Python"
+
+msgctxt "Main"
+msgid "Compiled Python files (__pycache__) in your projects, one row per project. Python makes them again on the next run. Clearing is permanent."
+msgstr "Arquivos compilados do Python (__pycache__) nos seus projetos, uma linha por projeto. O Python os recria na próxima execução. A limpeza é permanente."
+
+msgctxt "Main"
+msgid "Clear the Python caches in {}"
+msgstr "Limpar os caches do Python em {}"
+
+msgctxt "Main"
+msgid "This cannot be undone. Python makes the caches again the next time the project runs."
+msgstr "Isto não pode ser desfeito. O Python recria os caches na próxima vez que o projeto rodar."
+
+msgctxt "Main"
+msgid "Browser caches"
+msgstr "Caches dos navegadores"
+
+msgctxt "Main"
+msgid "Cache, crash reports and the on-device AI models of Chrome, Chromium, Brave and Firefox, and the cache of VS Code, VSCodium and Cursor. Logins, cookies, tabs, history and unsaved editor files stay. Close the app first. Clearing is permanent."
+msgstr "Cache, relatórios de falha e modelos de IA locais do Chrome, Chromium, Brave e Firefox, e o cache do VS Code, VSCodium e Cursor. Logins, cookies, abas, histórico e arquivos não salvos do editor ficam. Feche o aplicativo antes. A limpeza é permanente."
+
+msgctxt "Main"
+msgid "Clear the cache, crash reports and AI models of {}"
+msgstr "Limpar o cache, os relatórios de falha e os modelos de IA de {}"
+
+msgctxt "Main"
+msgid "This cannot be undone. Close the browser first: it is refused while it runs. Your logins, cookies, tabs and history are kept; the browser downloads or rebuilds the rest when it needs it."
+msgstr "Isto não pode ser desfeito. Feche o navegador antes: é recusado enquanto ele estiver aberto. Seus logins, cookies, abas e histórico são mantidos; o navegador baixa ou recria o resto quando precisar."
+
+msgctxt "Main"
+msgid "Browser: {}"
+msgstr "Navegador: {}"
+
+msgctxt "Main"
+msgid "Cargo folder: {}"
+msgstr "Pasta do Cargo: {}"
+
+msgctxt "Main"
+msgid "Flatpak cache: {}"
+msgstr "Cache do Flatpak: {}"
+
+msgctxt "Main"
+msgid "Clear the cache of the Flatpak app {}"
+msgstr "Limpar o cache do app Flatpak {}"
+
+msgctxt "Main"
+msgid "This cannot be undone. Close the app first: it is refused while it runs. Only its cache folder is cleared, not its settings, logins or saved data. The app rebuilds the cache, though a few apps download things again (offline music, map tiles)."
+msgstr "Isto não pode ser desfeito. Feche o app antes: é recusado enquanto ele roda. Só a pasta de cache é limpa, não as configurações, logins ou dados salvos. O app recria o cache, mas alguns baixam coisas de novo (músicas offline, mapas)."
+
+msgctxt "Main"
+msgid "Flatpak app caches"
+msgstr "Caches dos apps Flatpak"
+
+msgctxt "Main"
+msgid "The cache folder of each Flatpak app (~/.var/app/<app>/cache), from 1 MB. The app makes it again. Settings and saved data are not touched. Close the app first. Clearing is permanent."
+msgstr "A pasta de cache de cada app Flatpak (~/.var/app/<app>/cache), a partir de 1 MB. O app a recria. Configurações e dados salvos não são tocados. Feche o app antes. Limpar é permanente."
+
+msgctxt "Main"
+msgid "Clear Cargo's {}"
+msgstr "Limpar do Cargo: {}"
+
+msgctxt "Main"
+msgid "This cannot be undone. Cargo makes it again on the next build: the registry source from its downloads, the rest by downloading, so a build without network fails until then. ~/.cargo/bin and your login token are kept."
+msgstr "Isto não pode ser desfeito. O Cargo recria na próxima compilação: o código do registro a partir dos downloads, o resto baixando de novo, então uma compilação sem rede falha até lá. ~/.cargo/bin e seu token de login são mantidos."
+
+msgctxt "Main"
+msgid "Old Cargo downloads"
+msgstr "Downloads antigos do Cargo"
+
+msgctxt "Main"
+msgid "Crates and git sources in ~/.cargo that no build has used for {} days. Cargo downloads or unpacks them again when a project needs them (offline builds fail until then). Clearing is permanent."
+msgstr "Crates e fontes git em ~/.cargo que nenhuma compilação usa há {} dias. O Cargo baixa ou extrai de novo quando um projeto precisa (compilações offline falham até lá). Limpar é permanente."
+
+msgctxt "Main"
+msgid "Recent Cargo downloads"
+msgstr "Downloads recentes do Cargo"
+
+msgctxt "Main"
+msgid "Crates and git sources in ~/.cargo used in the last {} days. If you build Rust projects, clearing them only makes Cargo download them again."
+msgstr "Crates e fontes git em ~/.cargo usados nos últimos {} dias. Se você compila projetos Rust, limpar só faz o Cargo baixar tudo de novo."
+
+msgctxt "Main"
 msgid "Deleted log entries cannot be restored."
 msgstr "Entradas de log apagadas não podem ser restauradas."
 
@@ -868,8 +1016,8 @@ msgid "Installers and archives over 20 MB that have not changed for {} days."
 msgstr "Instaladores e arquivos compactados com mais de 20 MB que não mudam há {} dias."
 
 msgctxt "Main"
-msgid "Keep 100 MB"
-msgstr "Manter 100 MB"
+msgid "Delete old logs"
+msgstr "Apagar logs antigos"
 
 msgctxt "Main"
 msgid "Last change: {}"
@@ -988,8 +1136,20 @@ msgid "Old tool versions"
 msgstr "Versões antigas de ferramentas"
 
 msgctxt "Main"
-msgid "Versions of a tool. The 2 newest and any Proton or Steam tool a game is set to use are kept; only the others can go to the Trash. Official Proton from Steam is removed in Steam (Library, Tools)."
-msgstr "Versões de uma ferramenta. As 2 mais novas e qualquer Proton ou ferramenta do Steam que um jogo use são mantidas; só as outras podem ir para a Lixeira. O Proton oficial do Steam se remove no Steam (Biblioteca, Ferramentas)."
+msgid "Versions of a tool. The 2 newest and any Proton or Steam tool a game is set to use are kept; only the others can go to the Trash. Official Proton that Steam still lists is removed in Steam (Library, Tools); a folder Steam no longer lists can go to the Trash."
+msgstr "Versões de uma ferramenta. As 2 mais novas e qualquer Proton ou ferramenta do Steam que um jogo use são mantidas; só as outras podem ir para a Lixeira. O Proton oficial que o Steam ainda lista se remove no Steam (Biblioteca, Ferramentas); uma pasta que o Steam não lista mais pode ir para a Lixeira."
+
+msgctxt "Main"
+msgid "Steam leftovers of uninstalled games"
+msgstr "Restos do Steam de jogos desinstalados"
+
+msgctxt "Main"
+msgid "Steam keeps the Wine prefix and the shader cache of a game after you uninstall it. A prefix can hold saves that are not in Steam Cloud: open the folder and check before you remove it. Both folders go to the Trash."
+msgstr "O Steam mantém o prefixo do Wine e o cache de shaders de um jogo depois que você o desinstala. Um prefixo pode guardar saves que não estão na Nuvem do Steam: abra a pasta e confira antes de remover. As duas pastas vão para a Lixeira."
+
+msgctxt "Main"
+msgid "The game is not installed. Its Wine prefix may hold saves that are not in Steam Cloud: restore the folders from the Trash if you need them."
+msgstr "O jogo não está instalado. O prefixo do Wine pode guardar saves que não estão na Nuvem do Steam: restaure as pastas da Lixeira se precisar delas."
 
 msgctxt "Main"
 msgid "Newest, kept"
@@ -1126,6 +1286,174 @@ msgstr "{} tentativas de login falhas nas últimas 24 horas."
 msgctxt "Main"
 msgid "The firewall (ufw) is {}. Rules were not read; that needs administrator rights."
 msgstr "O firewall (ufw) está {}. As regras não foram lidas; isso exige direitos de administrador."
+
+msgctxt "Main"
+msgid "You are connected to the open Wi-Fi network {}. Anyone nearby can read what you send over it."
+msgstr "Você está conectado à rede Wi-Fi aberta {}. Qualquer pessoa por perto pode ler o que você envia por ela."
+
+msgctxt "Main"
+msgid "The Wi-Fi network {} uses WEP, which can be broken in minutes."
+msgstr "A rede Wi-Fi {} usa WEP, que pode ser quebrado em minutos."
+
+msgctxt "Main"
+msgid "The Wi-Fi network {} uses WPA1, an outdated protection."
+msgstr "A rede Wi-Fi {} usa WPA1, uma proteção ultrapassada."
+
+msgctxt "Main"
+msgid "Open Wi-Fi networks that this computer joins by itself: {}. Any hotspot with the same name will be trusted."
+msgstr "Redes Wi-Fi abertas em que este computador entra sozinho: {}. Qualquer ponto de acesso com o mesmo nome será aceito."
+
+msgctxt "Main"
+msgid "Every program is told to use a proxy (/etc/environment): {}"
+msgstr "Todos os programas são orientados a usar um proxy (/etc/environment): {}"
+
+msgctxt "Main"
+msgid "The desktop proxy is set to {}. A proxy sees all your web traffic; check it is yours."
+msgstr "O proxy da área de trabalho está em {}. Um proxy vê todo o seu tráfego web; confira se é seu."
+
+msgctxt "Main"
+msgid "Root certificates added by hand: {}. Whoever holds their keys can read your HTTPS traffic."
+msgstr "Certificados raiz adicionados à mão: {}. Quem tiver as chaves deles pode ler seu tráfego HTTPS."
+
+msgctxt "Main"
+msgid "Wi-Fi: {} is protected (WPA2 or better)."
+msgstr "Wi-Fi: {} está protegida (WPA2 ou melhor)."
+
+msgctxt "Main"
+msgid "Wi-Fi: not connected to a Wi-Fi network."
+msgstr "Wi-Fi: não está conectado a uma rede Wi-Fi."
+
+msgctxt "Main"
+msgid "Wi-Fi: no saved open network joins by itself."
+msgstr "Wi-Fi: nenhuma rede aberta salva se conecta sozinha."
+
+msgctxt "Main"
+msgid "Proxy: none set for the system or the desktop."
+msgstr "Proxy: nenhum definido para o sistema nem para a área de trabalho."
+
+msgctxt "Main"
+msgid "Root certificates: none added by hand."
+msgstr "Certificados raiz: nenhum adicionado à mão."
+
+msgctxt "Main"
+msgid "Checked, fine"
+msgstr "Verificado, tudo certo"
+
+msgctxt "Main"
+msgid "The SSH server accepts: {}. Anyone who can reach it can guess passwords; use keys only."
+msgstr "O servidor SSH aceita: {}. Quem alcançar o servidor pode tentar adivinhar senhas; use só chaves."
+
+msgctxt "Main"
+msgid "SSH server: not running."
+msgstr "Servidor SSH: desligado."
+
+msgctxt "Main"
+msgid "One hardware address answers for several network addresses: {}. A router can do this, but so can someone pretending to be it."
+msgstr "Um mesmo endereço de hardware responde por vários endereços da rede: {}. Um roteador pode fazer isso, mas alguém se passando por ele também."
+
+msgctxt "Main"
+msgid "Network neighbours: no hardware address answers for more than one address."
+msgstr "Vizinhos da rede: nenhum endereço de hardware responde por mais de um endereço."
+
+msgctxt "Main"
+msgid "File shares open to anyone on the network, no password: {}."
+msgstr "Compartilhamentos abertos a qualquer um na rede, sem senha: {}."
+
+msgctxt "Main"
+msgid "File sharing: Samba and NFS are not running."
+msgstr "Compartilhamento de arquivos: Samba e NFS não estão rodando."
+
+msgctxt "Main"
+msgid "File sharing: no Samba or NFS share is open to everyone."
+msgstr "Compartilhamento de arquivos: nenhum compartilhamento Samba ou NFS está aberto a todos."
+
+msgctxt "Main"
+msgid "SSH server: running with passwords and root login off."
+msgstr "Servidor SSH: ligado, com senhas e login de root desativados."
+
+msgctxt "Main"
+msgid "/etc/hosts sends names to public addresses: {}. This can redirect a site."
+msgstr "O /etc/hosts envia nomes para endereços públicos: {}. Isso pode redirecionar um site."
+
+msgctxt "Main"
+msgid "/etc/hosts: no name is redirected to a public address."
+msgstr "/etc/hosts: nenhum nome é redirecionado para um endereço público."
+
+msgctxt "Main"
+msgid "Shows which devices are on your network and which risky doors they leave open. It tries a connection to every address, so scan only networks you own or may scan."
+msgstr "Mostra quais dispositivos estão na sua rede e quais portas arriscadas eles deixam abertas. Tenta uma conexão a cada endereço, então escaneie apenas redes suas ou que você tem permissão para escanear."
+
+msgctxt "Main"
+msgid "Scan local network"
+msgstr "Escanear rede local"
+
+msgctxt "Main"
+msgid "Scan with nmap"
+msgstr "Escanear com nmap"
+
+msgctxt "Main"
+msgid "nmap is not installed: sudo apt install nmap"
+msgstr "O nmap não está instalado: sudo apt install nmap"
+
+msgctxt "Main"
+msgid "No local network found (a VPN is not scanned)."
+msgstr "Nenhuma rede local encontrada (uma VPN não é verificada)."
+
+msgctxt "Main"
+msgid "nmap failed."
+msgstr "O nmap falhou."
+
+msgctxt "Main"
+msgid "No device answered."
+msgstr "Nenhum dispositivo respondeu."
+
+msgctxt "Main"
+msgid "This computer"
+msgstr "Este computador"
+
+msgctxt "Main"
+msgid "Router"
+msgstr "Roteador"
+
+msgctxt "Main"
+msgid "Device"
+msgstr "Dispositivo"
+
+msgctxt "Main"
+msgid "TV or speaker"
+msgstr "TV ou caixa de som"
+
+msgctxt "Main"
+msgid "Printer"
+msgstr "Impressora"
+
+msgctxt "Main"
+msgid "Camera"
+msgstr "Câmera"
+
+msgctxt "Main"
+msgid "Computer or server"
+msgstr "Computador ou servidor"
+
+msgctxt "Main"
+msgid "Phone or tablet"
+msgstr "Celular ou tablet"
+
+msgctxt "Main"
+msgid "Unknown maker"
+msgstr "Fabricante desconhecido"
+
+msgctxt "Main"
+msgid "Hardware address shared by {} addresses"
+msgstr "Endereço de hardware compartilhado por {} endereços"
+
+msgctxt "Main"
+msgid "Devices found: {}. With a risky open port: {}."
+msgstr "Dispositivos encontrados: {}. Com porta aberta de risco: {}."
+
+msgctxt "Main"
+msgid "no open ports found"
+msgstr "nenhuma porta aberta encontrada"
 
 msgctxt "Main"
 msgid "Hide"
@@ -1316,8 +1644,24 @@ msgid "System snapshots (Timeshift)"
 msgstr "Snapshots do sistema (Timeshift)"
 
 msgctxt "Main"
-msgid "{} snapshots, the oldest from {}. They can take a lot of space; open Timeshift to see their size and delete old ones."
-msgstr "{} snapshots, o mais antigo de {}. Podem ocupar muito espaço; abra o Timeshift para ver o tamanho e apagar os antigos."
+msgid "{} snapshots, the oldest from {}. They can take a lot of space; open Timeshift to see their size. The newest 3 and those from the last 6 months are kept, older ones can be deleted. Snapshots share unchanged files, so the space only comes back when no newer snapshot uses them."
+msgstr "{} snapshots, o mais antigo de {}. Podem ocupar muito espaço; abra o Timeshift para ver o tamanho. Os 3 mais recentes e os dos últimos 6 meses são mantidos; os mais antigos podem ser apagados. Os snapshots compartilham arquivos que não mudaram, então o espaço só volta quando nenhum snapshot mais novo os usa."
+
+msgctxt "Main"
+msgid "Kept"
+msgstr "Mantido"
+
+msgctxt "Main"
+msgid "Delete"
+msgstr "Apagar"
+
+msgctxt "Main"
+msgid "Delete Timeshift snapshot {}"
+msgstr "Apagar o snapshot do Timeshift {}"
+
+msgctxt "Main"
+msgid "This cannot be undone. The snapshot is removed by Timeshift itself; newer snapshots are not touched."
+msgstr "Não dá para desfazer. O próprio Timeshift remove o snapshot; os mais novos não são alterados."
 
 msgctxt "Main"
 msgid "Timeshift is set up, but its snapshots could not be listed without administrator rights. Open Timeshift to see them."
@@ -1394,6 +1738,14 @@ msgstr "Espaço e Segurança são verificados na primeira vez que você os abre.
 msgctxt "Main"
 msgid "Disk errors"
 msgstr "Erros de disco"
+
+msgctxt "Main"
+msgid "A disk is failing"
+msgstr "Um disco está falhando"
+
+msgctxt "Main"
+msgid "SMART says a disk is failing. Back up your files."
+msgstr "O SMART diz que um disco está falhando. Faça backup dos seus arquivos."
 
 msgctxt "Main"
 msgid "Disk errors were seen since this boot."
@@ -1932,6 +2284,34 @@ msgid "Uptime"
 msgstr "Tempo ligado"
 
 msgctxt "Main"
+msgid "Install zram swap: in memory, fast, no disk wear"
+msgstr "Instalar swap em zram: na memória, rápido, sem desgaste do disco"
+
+msgctxt "Main"
+msgid "Add a swap file: on disk, needed to hibernate"
+msgstr "Adicionar um arquivo de swap: no disco, necessário para hibernar"
+
+msgctxt "Main"
+msgid "Install it (it starts by itself)"
+msgstr "Instala (ele inicia sozinho)"
+
+msgctxt "Main"
+msgid "Check that it is running"
+msgstr "Confere se está em execução"
+
+msgctxt "Main"
+msgid "zram is only {} MB for {} GB of memory, so it fills up fast. Open the help below to make it bigger."
+msgstr "O zram tem só {} MB para {} GB de memória, então enche rápido. Abra a ajuda abaixo para aumentá-lo."
+
+msgctxt "Main"
+msgid "To set the zram size by hand, open /etc/default/zramswap in a text editor as root. Remove the # in front of PERCENT=50 and ALGO=lz4, then change ALGO to zstd. PERCENT=50 uses half of the memory and replaces the fixed SIZE=256. Save the file and restart zram: sudo systemctl restart zramswap. Or use the command below, which does the same."
+msgstr "Para definir o tamanho do zram manualmente, abra /etc/default/zramswap em um editor de texto como root. Remova o # na frente de PERCENT=50 e de ALGO=lz4 e troque ALGO por zstd. PERCENT=50 usa metade da memória e substitui o SIZE=256 fixo. Salve o arquivo e reinicie o zram: sudo systemctl restart zramswap. Ou use o comando abaixo, que faz o mesmo."
+
+msgctxt "Main"
+msgid "Set zram to half of the memory"
+msgstr "Definir o zram como metade da memória"
+
+msgctxt "Main"
 msgid "Swap"
 msgstr "Swap"
 
@@ -1956,8 +2336,28 @@ msgid "Not configured"
 msgstr "Não configurado"
 
 msgctxt "Main"
-msgid "Memory safety net"
-msgstr "Proteção contra falta de memória"
+msgid "Swap"
+msgstr "Swap"
+
+msgctxt "Main"
+msgid "Low-memory watcher"
+msgstr "Vigia de pouca memória"
+
+msgctxt "Main"
+msgid "The swap file command makes a 4 GB file and keeps it after a reboot. It does not suit btrfs or an encrypted setup that needs hibernation; follow your distribution's guide there."
+msgstr "O comando do arquivo de swap cria um arquivo de 4 GB e o mantém após reiniciar. Não serve para btrfs nem para um disco criptografado que precise hibernar; siga o guia da sua distribuição nesses casos."
+
+msgctxt "Main"
+msgid "What a low-memory watcher does"
+msgstr "O que faz um vigia de pouca memória"
+
+msgctxt "Main"
+msgid "When memory runs out, the kernel only stops a program after the desktop has been frozen, sometimes for minutes. Without swap or a watcher the computer can freeze that way."
+msgstr "Quando a memória acaba, o kernel só encerra um programa depois que a área de trabalho travou, às vezes por minutos. Sem swap nem vigia o computador pode travar assim."
+
+msgctxt "Main"
+msgid "A watcher (earlyoom or systemd-oomd) checks the free memory all the time and closes the biggest program before the freeze, so the rest of your work stays safe."
+msgstr "Um vigia (earlyoom ou systemd-oomd) confere a memória livre o tempo todo e fecha o maior programa antes do travamento, então o resto do seu trabalho fica seguro."
 
 msgctxt "Main"
 msgid "Swap and zram: what they are"
@@ -1998,10 +2398,6 @@ msgstr "Nada está vigiando a falta de memória (systemd-oomd ou earlyoom)."
 msgctxt "Main"
 msgid "The kernel killed {} programs for lack of memory since the previous boot."
 msgstr "O kernel encerrou {} programas por falta de memória desde o boot anterior."
-
-msgctxt "Main"
-msgid "Without swap or a watcher, the computer can freeze for minutes when memory runs out. To add a watcher, run: {}"
-msgstr "Sem swap nem vigia, o computador pode travar por minutos quando a memória acaba. Para adicionar um vigia, execute: {}"
 
 msgctxt "Main"
 msgid "What are the boot phases?"
@@ -2100,6 +2496,22 @@ msgid "Review and clean up..."
 msgstr "Revisar e limpar..."
 
 msgctxt "Main"
+msgid "Each item is checked again before it goes. Untick what you want to keep."
+msgstr "Cada item é verificado de novo antes de sair. Desmarque o que quiser manter."
+
+msgctxt "Main"
+msgid "Analyze"
+msgstr "Analisar"
+
+msgctxt "Main"
+msgid "Analyze again"
+msgstr "Analisar de novo"
+
+msgctxt "Main"
+msgid "Finds the biggest folders and files in your home and your game libraries. It reads all of your home folder, so it can take a while. Only for information: nothing here is offered for removal."
+msgstr "Encontra as maiores pastas e arquivos da sua pasta pessoal e suas bibliotecas de jogos. Lê toda a pasta pessoal, então pode demorar. Só para informação: nada aqui é oferecido para remoção."
+
+msgctxt "Main"
 msgid "Docker build cache"
 msgstr "Cache de construção do Docker"
 
@@ -2112,12 +2524,12 @@ msgid "Build folders, installers and Trash entries older than {} days (change it
 msgstr "Pastas de build, instaladores e itens da Lixeira com mais de {} dias (mude em Preferências), e versões antigas de ferramentas (todas menos as 2 mais novas). A maioria vai para a Lixeira, e dá para restaurar; itens antigos da Lixeira são apagados de vez."
 
 msgctxt "Main"
-msgid "Old build output (target, node_modules)"
-msgstr "Saída de build antiga (target, node_modules)"
+msgid "Old build output (target, node_modules, .venv)"
+msgstr "Saída de build antiga (target, node_modules, .venv)"
 
 msgctxt "Main"
-msgid "Found next to a Cargo.toml or package.json and not changed for {} days. They are moved to the Trash and rebuilt by the next build."
-msgstr "Encontradas ao lado de um Cargo.toml ou package.json e sem mudanças há {} dias. Vão para a Lixeira e são recriadas no próximo build."
+msgid "Found next to a Cargo.toml, package.json or Python project file and not changed for {} days. They are moved to the Trash and rebuilt by the next build (a .venv by creating it again)."
+msgstr "Encontradas ao lado de um Cargo.toml, package.json ou arquivo de projeto Python e sem mudanças há {} dias. Vão para a Lixeira e são recriadas no próximo build (uma .venv, criando-a de novo)."
 
 msgctxt "Main"
 msgid "Old Trash entries"
@@ -2136,8 +2548,60 @@ msgid "Emptying the Trash is off, so you can still restore what was cleaned. Tur
 msgstr "Esvaziar a Lixeira está desligado, assim você ainda pode restaurar o que foi limpo. Ative nas Preferências."
 
 msgctxt "Main"
-msgid "Recent build output (target, node_modules)"
-msgstr "Saída de build recente (target, node_modules)"
+msgid "Recent build output (target, node_modules, .venv)"
+msgstr "Saída de build recente (target, node_modules, .venv)"
+
+msgctxt "Main"
+msgid "Python caches: {}"
+msgstr "Caches do Python: {}"
+
+msgctxt "Main"
+msgid "Old system logs"
+msgstr "Logs antigos do sistema"
+
+msgctxt "Main"
+msgid "No old system logs."
+msgstr "Nenhum log antigo do sistema."
+
+msgctxt "Main"
+msgid "{} old copies of the logs in /var/log (the ones named .1, .2.gz and so on). The logs being written now are kept."
+msgstr "{} cópias antigas dos logs em /var/log (as chamadas .1, .2.gz e assim por diante). Os logs em uso agora são mantidos."
+
+msgctxt "Main"
+msgid "Delete old system logs"
+msgstr "Apagar logs antigos do sistema"
+
+msgctxt "Main"
+msgid "Delete the old system logs"
+msgstr "Apagar os logs antigos do sistema"
+
+msgctxt "Main"
+msgid "This cannot be undone. The logs being written now are kept."
+msgstr "Isto não pode ser desfeito. Os logs em uso agora são mantidos."
+
+msgctxt "Main"
+msgid "Crash dumps"
+msgstr "Despejos de falhas"
+
+msgctxt "Main"
+msgid "No crash dumps."
+msgstr "Nenhum despejo de falha."
+
+msgctxt "Main"
+msgid "Memory copies of crashed programs: {} in total, most from {}. They only help to debug a crash; the crash stays in the system log."
+msgstr "Cópias da memória de programas que falharam: {} no total, a maioria de {}. Só servem para depurar uma falha; a falha continua no log do sistema."
+
+msgctxt "Main"
+msgid "Delete crash dumps"
+msgstr "Apagar despejos de falhas"
+
+msgctxt "Main"
+msgid "Delete the crash dumps"
+msgstr "Apagar os despejos de falhas"
+
+msgctxt "Main"
+msgid "This cannot be undone. The crashes stay listed by coredumpctl, without their memory copy."
+msgstr "Isto não pode ser desfeito. As falhas continuam listadas pelo coredumpctl, sem a cópia da memória."
 
 msgctxt "Main"
 msgid "Build folders changed in the last {} days: you may be working on them. They are moved to the Trash and rebuilt by the next build."

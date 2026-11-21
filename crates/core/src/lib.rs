@@ -6,6 +6,7 @@ pub mod boot;
 pub mod files;
 pub mod health;
 pub mod history;
+pub mod lan;
 pub mod perf;
 pub mod security;
 pub mod services;

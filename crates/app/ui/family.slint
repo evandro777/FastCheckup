@@ -1,4 +1,4 @@
-// Family kit v9 (with about.slint and controls.slint): the colors, type scale and spacing shared by all Fast apps (see FastHello's
+// Family kit v10 (with about.slint and controls.slint): the colors, type scale and spacing shared by all Fast apps (see FastHello's
 // docs/UI-STYLE.md).
 // Copied verbatim into every app. Do not edit it in one app only: change FastHello's copy, bump the version above
 // and copy it to the others.
@@ -15,16 +15,17 @@ export global Family {
     out property <color> success: root.dark ? #3fb950 : #1a7f37;
     out property <color> info: root.dark ? #5b97f7 : #2f6fdb;
     // Secondary text: the foreground, softened.
-    out property <color> muted: Palette.foreground.with-alpha(0.7);
+    // A touch stronger on dark: small grey text on a dark background is the hardest to read.
+    out property <color> muted: Palette.foreground.with-alpha(root.dark ? 0.75 : 0.7);
     // The picked row of a list or table: a quiet tint of the accent plus a 3 px accent bar on its left edge (`selected-bar`),
     // never a full accent fill. The text keeps the foreground color.
-    out property <color> selected: Palette.accent-background.with-alpha(root.dark ? 0.26 : 0.18);
+    out property <color> selected: Palette.accent-background.with-alpha(root.dark ? 0.26 : 0.14);
     out property <length> selected-bar: 3px;
     // The dim behind a dialog.
     out property <color> scrim: #000000a0;
 
     // Type scale. Nothing else: a size that is not here does not exist in the family.
-    out property <length> caption: 11px;
+    out property <length> caption: 12px;
     out property <length> body: 13px;
     out property <length> title: 16px;
     out property <length> page-title: 20px;

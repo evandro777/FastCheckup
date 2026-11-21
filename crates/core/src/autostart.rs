@@ -153,7 +153,12 @@ pub fn scan(dirs: &Dirs) -> Vec<Entry> {
                     .unwrap_or_else(|| file.trim_end_matches(".desktop").into()),
                 comment: map.get("Comment").unwrap_or(&"").to_string(),
                 exec: map.get("Exec").unwrap_or(&"").to_string(),
-                icon: map.get("Icon").unwrap_or(&"").to_string(),
+                // Portal-written entries (Flatpak) have no Icon=; a Flatpak's icon is named after its app id.
+                icon: map
+                    .get("Icon")
+                    .or_else(|| map.get("X-Flatpak"))
+                    .unwrap_or(&"")
+                    .to_string(),
                 delay: map.get(DELAY_KEY).and_then(|v| v.parse().ok()).unwrap_or(0),
                 essential: essential(&file),
                 duplicate_of: String::new(),
@@ -346,9 +351,24 @@ fn put(dirs: &Dirs, file: &str, text: &str) -> io::Result<()> {
     match (same, user.exists()) {
         (true, true) => fs::remove_file(&user),
         (true, false) => Ok(()),
-        // Atomic, so a crash never leaves a half-written file (and a failed write leaves no temp file).
-        (false, _) => crate::files::write_atomic(&user, text),
+        (false, _) => write_entry(&user, text),
     }
+}
+
+/// Atomic, so a crash never leaves a half-written file (and a failed write leaves no temp file). Not `files::write_atomic`:
+/// that one makes the folder private (0700), and `~/.config/autostart` is not ours. A symlinked entry (dotfile
+/// managers) is written through, so the link stays.
+fn write_entry(path: &Path, text: &str) -> io::Result<()> {
+    let target = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    if let Some(dir) = target.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let tmp = target.with_extension(format!("tmp{}", std::process::id()));
+    fs::write(&tmp, text)
+        .and_then(|()| fs::rename(&tmp, &target))
+        .inspect_err(|_| {
+            let _ = fs::remove_file(&tmp);
+        })
 }
 
 pub fn disable(dirs: &Dirs, file: &str) -> io::Result<()> {
@@ -619,6 +639,29 @@ mod tests {
         assert_eq!(scan(&f.dirs)[0].state, State::Disabled);
         enable(&f.dirs, "dropbox.desktop").unwrap();
         assert_eq!(fs::read_to_string(&mine).unwrap(), APP);
+    }
+
+    #[test]
+    fn writing_keeps_the_folder_mode_and_a_symlinked_entry() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        let f = fixture("link", &[]);
+        fs::create_dir_all(&f.dirs.user).unwrap();
+        fs::set_permissions(&f.dirs.user, fs::Permissions::from_mode(0o755)).unwrap();
+        let real = f.root.join("dotfiles-app.desktop");
+        fs::write(&real, APP).unwrap();
+        let link = f.dirs.user.join("app.desktop");
+        symlink(&real, &link).unwrap();
+        disable(&f.dirs, "app.desktop").unwrap();
+        assert!(
+            fs::symlink_metadata(&link).unwrap().file_type().is_symlink(),
+            "the link stays"
+        );
+        assert!(
+            fs::read_to_string(&real)
+                .unwrap()
+                .ends_with("X-GNOME-Autostart-enabled=false\n")
+        );
+        assert_eq!(fs::metadata(&f.dirs.user).unwrap().permissions().mode() & 0o777, 0o755);
     }
 
     #[test]

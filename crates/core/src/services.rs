@@ -1,13 +1,18 @@
 //! Services module: lists systemd services with their boot time, checks what depends on one, and enables/disables it
 //! through `pkexec systemctl`. Parsers take plain text so tests need no systemd.
 use std::{
+    collections::HashMap,
     fs,
-    io::{self, Write},
+    io::{self, Read, Write},
     path::Path,
     process::{Command, Output, Stdio},
+    time::{Duration, Instant},
 };
 
-use crate::autostart::{matches, rules};
+use crate::{
+    apps::run,
+    autostart::{matches, rules},
+};
 
 /// The only binary run as root; also what the polkit policy in `packaging/` matches.
 const SYSTEMCTL: &str = "/usr/bin/systemctl";
@@ -25,6 +30,112 @@ pub struct Service {
     pub essential: bool,
     /// Started by a timer after boot, so it is not a boot cost.
     pub background: bool,
+    /// Debian package that ships the unit file; empty when none does (see `packaged`).
+    pub package: String,
+    /// False when there is no dpkg database, so an empty `package` means nothing.
+    pub packaged: bool,
+    /// Seconds this unit sat on the boot's critical chain (it held the desktop back); 0 when it was not on it.
+    pub delay: f32,
+    /// Sockets/paths/timers that start it on demand, space separated.
+    pub triggers: String,
+    pub memory_mb: f32,
+    pub cpu_secs: f32,
+    /// The last run did not end in success.
+    pub failed: bool,
+    pub restarts: u32,
+    /// First `Documentation=` entry (`https://…` or `man:…`); empty for SysV scripts, whose entry is generic.
+    pub doc: String,
+    /// Generated from an old `/etc/init.d` script.
+    pub sysv: bool,
+}
+
+/// What `systemctl show` and dpkg tell about one unit.
+#[derive(Default)]
+struct Facts {
+    package: String,
+    triggers: String,
+    memory_mb: f32,
+    cpu_secs: f32,
+    failed: bool,
+    restarts: u32,
+    doc: String,
+    sysv: bool,
+}
+
+/// `systemctl show a b -p …` prints one `Key=Value` block per unit, blank-line separated; keyed here by `Id`.
+fn parse_show(text: &str) -> HashMap<String, HashMap<String, String>> {
+    text.split("\n\n")
+        .filter_map(|block| {
+            let props: HashMap<String, String> = block
+                .lines()
+                .filter_map(|l| l.split_once('='))
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            Some((props.get("Id")?.clone(), props))
+        })
+        .collect()
+}
+
+/// systemd prints `[not set]` or u64::MAX when it does not account for a value.
+fn counter(v: Option<&String>) -> Option<f64> {
+    v?.parse::<u64>().ok().filter(|n| *n != u64::MAX).map(|n| n as f64)
+}
+
+/// `/usr/lib/x` and `/lib/x` are the same file on merged-/usr systems, and dpkg only knows the package's spelling.
+fn unmerged(path: &str) -> &str {
+    path.strip_prefix("/usr")
+        .filter(|p| p.starts_with("/lib/"))
+        .unwrap_or(path)
+}
+
+fn facts(units: &[String]) -> HashMap<String, Facts> {
+    let units: Vec<&str> = units.iter().map(String::as_str).filter(|u| valid(u)).collect();
+    let props = "Id,FragmentPath,SourcePath,TriggeredBy,MemoryCurrent,CPUUsageNSec,Result,NRestarts,Documentation";
+    let args = [&["show", "-p", props][..], &units[..]].concat();
+    let shown = parse_show(&run("systemctl", &args));
+    let file_of = |p: &HashMap<String, String>| {
+        ["SourcePath", "FragmentPath"]
+            .iter()
+            .filter_map(|k| p.get(*k).filter(|v| !v.is_empty()))
+            .next()
+            .cloned()
+    };
+    let files: Vec<String> = shown.values().filter_map(file_of).collect();
+    let mut owners = HashMap::new();
+    if Path::new("/var/lib/dpkg/status").exists() && !files.is_empty() {
+        let both: Vec<&str> = files.iter().flat_map(|f| [f.as_str(), unmerged(f)]).collect();
+        let out = run("dpkg-query", &[&["-S"][..], &both[..]].concat());
+        owners.extend(
+            crate::apps::parse_owners(&out)
+                .into_iter()
+                .map(|(pkg, f)| (unmerged(&f).to_string(), pkg)),
+        );
+    }
+    shown
+        .into_iter()
+        .map(|(unit, p)| {
+            let get = |k: &str| p.get(k).map(String::as_str).unwrap_or("");
+            let sysv = get("SourcePath").starts_with("/etc/init.d/");
+            let doc = get("Documentation")
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .trim_matches('"');
+            let f = Facts {
+                package: file_of(&p)
+                    .and_then(|f| owners.get(unmerged(&f)).cloned())
+                    .unwrap_or_default(),
+                triggers: get("TriggeredBy").to_string(),
+                memory_mb: counter(p.get("MemoryCurrent")).map_or(0.0, |b| (b / 1048576.0) as f32),
+                cpu_secs: counter(p.get("CPUUsageNSec")).map_or(0.0, |n| (n / 1e9) as f32),
+                failed: !matches!(get("Result"), "" | "success"),
+                restarts: get("NRestarts").parse().unwrap_or(0),
+                doc: if sysv { String::new() } else { doc.to_string() },
+                sysv,
+            };
+            (unit, f)
+        })
+        .collect()
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -59,22 +170,64 @@ pub fn valid(unit: &str) -> bool {
     })
 }
 
-pub(crate) fn run(program: &str, args: &[&str]) -> String {
-    Command::new(program)
-        .args(args)
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default()
+/// Like `Command::output`, but a program still running after `limit` is killed and what it printed so far is kept:
+/// a stuck daemon (Docker, a dead NFS mount for `df`, a broken GPU driver) must not leave a scan busy forever.
+/// For reads only. The kill would cut a deletion short. Stdin is closed so nothing waits for an answer.
+pub(crate) fn output_within(cmd: &mut Command, limit: Duration) -> io::Result<Output> {
+    let mut child = cmd
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    // Drained on their own threads so a full pipe cannot block the child.
+    fn drain(pipe: Option<impl Read + Send + 'static>) -> std::sync::mpsc::Receiver<Vec<u8>> {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            if let Some(mut p) = pipe {
+                let _ = p.read_to_end(&mut buf);
+            }
+            let _ = tx.send(buf);
+        });
+        rx
+    }
+    let (out, err) = (drain(child.stdout.take()), drain(child.stderr.take()));
+    let deadline = Instant::now() + limit;
+    let mut killed = false;
+    let status = loop {
+        match child.try_wait()? {
+            Some(status) => break status,
+            None if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
+            None => {
+                let _ = child.kill();
+                killed = true;
+                break child.wait()?;
+            }
+        }
+    };
+    // A killed program's own children can keep the pipe open, so after a kill the readers get a moment, not forever.
+    let take = |rx: std::sync::mpsc::Receiver<Vec<u8>>| {
+        if killed {
+            rx.recv_timeout(Duration::from_millis(300)).unwrap_or_default()
+        } else {
+            rx.recv().unwrap_or_default()
+        }
+    };
+    Ok(Output {
+        status,
+        stdout: take(out),
+        stderr: take(err),
+    })
 }
 
 /// `(unit, enabled)` from `list-unit-files --no-legend --plain`. Templates (`getty@.service`) are skipped: they are
-/// never started on their own.
+/// never started on their own. `generated` (SysV scripts in /etc/init.d) runs at boot, so it counts as enabled.
 fn parse_unit_files(text: &str) -> Vec<(String, bool)> {
     text.lines()
         .filter_map(|l| {
             let mut c = l.split_whitespace();
             let (unit, state) = (c.next()?, c.next()?);
-            (unit.ends_with(".service") && !unit.contains("@.")).then(|| (unit.to_string(), state == "enabled"))
+            (unit.ends_with(".service") && !unit.contains("@.")).then(|| (unit.to_string(), state != "disabled"))
         })
         .collect()
 }
@@ -119,23 +272,47 @@ pub fn scan() -> Vec<Service> {
         &[
             "list-unit-files",
             "--type=service",
-            "--state=enabled,disabled",
+            "--state=enabled,disabled,generated",
             "--no-legend",
             "--plain",
         ],
     ));
-    let loaded = parse_units(&run(
-        "systemctl",
-        &["list-units", "--type=service", "--all", "--no-legend", "--plain"],
-    ));
-    let blame = parse_blame(&run("systemd-analyze", &["blame", "--no-pager"]));
+    let names: Vec<String> = files.iter().map(|(u, _)| u.clone()).collect();
+    // The slow reads (systemctl show + dpkg, blame, critical chain) overlap, so the page waits for the slowest only.
+    let (facts, chain, loaded, blame) = std::thread::scope(|s| {
+        let facts = s.spawn(|| facts(&names));
+        let chain = s.spawn(crate::boot::critical_chain);
+        let blame = s.spawn(|| parse_blame(&run("systemd-analyze", &["blame", "--no-pager"])));
+        let loaded = parse_units(&run(
+            "systemctl",
+            &["list-units", "--type=service", "--all", "--no-legend", "--plain"],
+        ));
+        (
+            facts.join().unwrap_or_default(),
+            chain.join().unwrap_or_default(),
+            loaded,
+            blame.join().unwrap_or_default(),
+        )
+    });
+    let packaged = Path::new("/var/lib/dpkg/status").exists();
     let rules = rules();
     let mut out: Vec<Service> = files
         .into_iter()
         .map(|(unit, enabled)| {
             let stem = unit.trim_end_matches(".service").to_lowercase();
             let unit_info = loaded.iter().find(|(u, ..)| *u == unit);
+            let f = facts.get(&unit);
             Service {
+                package: f.map(|f| f.package.clone()).unwrap_or_default(),
+                packaged,
+                delay: chain.iter().find(|l| l.unit == unit).map_or(0.0, |l| l.took),
+                triggers: f.map(|f| f.triggers.clone()).unwrap_or_default(),
+                memory_mb: f.map_or(0.0, |f| f.memory_mb),
+                cpu_secs: f.map_or(0.0, |f| f.cpu_secs),
+                failed: f.is_some_and(|f| f.failed),
+                restarts: f.map_or(0, |f| f.restarts),
+                doc: f.map(|f| f.doc.clone()).unwrap_or_default(),
+                sysv: f.is_some_and(|f| f.sysv),
                 description: unit_info.map(|(_, d, _)| d.clone()).unwrap_or_default(),
                 active: unit_info.is_some_and(|(.., a)| *a),
                 secs: blame.iter().find(|(u, _)| *u == unit).map_or(0.0, |(_, s)| *s),
@@ -299,6 +476,53 @@ mod tests {
     use std::os::unix::process::ExitStatusExt;
 
     use super::*;
+
+    #[test]
+    fn a_stuck_command_is_killed_and_a_quick_one_keeps_its_output() {
+        let slow = output_within(
+            Command::new("sh").args(["-c", "echo partial; exec sleep 30"]),
+            Duration::from_millis(300),
+        )
+        .unwrap();
+        assert!(!slow.status.success());
+        assert_eq!(String::from_utf8_lossy(&slow.stdout).trim(), "partial");
+        // A grandchild that keeps the pipe open must not hold the caller either.
+        let start = Instant::now();
+        output_within(
+            Command::new("sh").args(["-c", "sleep 3 & wait"]),
+            Duration::from_millis(200),
+        )
+        .unwrap();
+        assert!(start.elapsed() < Duration::from_secs(5));
+        let quick = output_within(
+            Command::new("sh").args(["-c", "echo hi; echo oops >&2"]),
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        assert!(quick.status.success());
+        assert_eq!(String::from_utf8_lossy(&quick.stderr).trim(), "oops");
+    }
+
+    #[test]
+    fn show_reads_blocks_and_unknown_counters() {
+        let text = "Id=cups.service\nTriggeredBy=cups.path cups.socket\nMemoryCurrent=2097152\nNRestarts=0\nDocumentation=\"man:cupsd(8)\"\nResult=success\n\nId=AMPctl.service\nMemoryCurrent=[not set]\nCPUUsageNSec=18446744073709551615\nResult=exit-code\n";
+        let m = parse_show(text);
+        assert_eq!(m.len(), 2);
+        assert_eq!(m["cups.service"]["TriggeredBy"], "cups.path cups.socket");
+        assert_eq!(counter(m["cups.service"].get("MemoryCurrent")), Some(2097152.0));
+        assert_eq!(counter(m["AMPctl.service"].get("MemoryCurrent")), None);
+        assert_eq!(counter(m["AMPctl.service"].get("CPUUsageNSec")), None);
+    }
+
+    #[test]
+    fn merged_usr_paths_match_dpkg_spelling() {
+        assert_eq!(
+            unmerged("/usr/lib/systemd/system/cups.service"),
+            "/lib/systemd/system/cups.service"
+        );
+        assert_eq!(unmerged("/etc/init.d/AMPctl"), "/etc/init.d/AMPctl");
+        assert_eq!(unmerged("/usr/share/x"), "/usr/share/x");
+    }
 
     fn exited(code: i32, stderr: &str) -> Output {
         Output {

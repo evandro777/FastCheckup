@@ -1,6 +1,12 @@
 //! Performance snapshot for the Overview: memory, swap, load, a verdict that names its cause and the busiest apps.
 //! Read straight from `/proc` (no `top`/`ps`/`free`). Parsers take text so tests need no system. Report only.
-use std::{collections::HashMap, fs, thread, time::Duration};
+use std::{
+    collections::HashMap,
+    fs,
+    sync::Mutex,
+    thread,
+    time::{Duration, Instant},
+};
 
 #[derive(Debug, Default, PartialEq)]
 pub struct AppLoad {
@@ -138,11 +144,26 @@ fn sample() -> (u64, HashMap<u32, (String, u64)>) {
     (total, pids)
 }
 
-/// Blocks about a second: CPU use needs two samples. Run it on a worker thread.
+type Sample = (u64, HashMap<u32, (String, u64)>);
+
+/// The last sample, so a repeat call measures against it like `top` does instead of sleeping again.
+static PREV: Mutex<Option<(Instant, Sample)>> = Mutex::new(None);
+
+/// CPU use needs two samples: the first call (or one after 5 s of silence, which would only average a long window)
+/// waits 0.3 s, later calls reuse the previous one. Run it on a worker thread.
 pub fn snapshot() -> Snapshot {
-    let (t0, p0) = sample();
-    thread::sleep(Duration::from_secs(1));
-    let (t1, p1) = sample();
+    let prev = PREV.lock().unwrap_or_else(|e| e.into_inner()).take();
+    let (t0, p0) = match prev {
+        Some((at, s)) if at.elapsed() < Duration::from_secs(5) => s,
+        _ => {
+            let s = sample();
+            thread::sleep(Duration::from_millis(300));
+            s
+        }
+    };
+    let now = sample();
+    *PREV.lock().unwrap_or_else(|e| e.into_inner()) = Some((Instant::now(), now.clone()));
+    let (t1, p1) = now;
     let dt = t1.saturating_sub(t0).max(1) as f32;
     let me = std::process::id();
 

@@ -1,4 +1,4 @@
-// Family kit v7: the small controls every Fast app draws the same way (see docs/UI-STYLE.md).
+// Family kit v8: the small controls every Fast app draws the same way (see docs/UI-STYLE.md).
 // Copied verbatim into every app, like family.slint. No strings live here: the caller passes every label, so the gettext
 // contexts do not change.
 import { Palette } from "std-widgets.slint";
@@ -13,12 +13,30 @@ export component TabItem inherits Rectangle {
     accessible-label: root.title;
     accessible-item-selected: root.active;
     accessible-action-default => { root.clicked(); }
-    background: touch.has-hover && !root.active ? Palette.alternate-background : transparent;
+    background: touch.has-hover && !root.active ? Palette.foreground.with-alpha(0.06) : transparent;
+    border-radius: Family.control-radius;
     // The tab is always as wide as its bold title, so going bold on selection does not move the other tabs.
     preferred-width: bold.preferred-width + 28px;
     min-width: self.preferred-width;
     bold := Text { text: root.title; font-weight: Family.section-weight; visible: false; }
-    touch := TouchArea { clicked => { root.clicked(); } }
+    // Reachable with Tab, picked with Space or Enter.
+    if fs.has-focus: Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-width: 2px;
+        border-color: Palette.accent-background;
+        border-radius: Family.control-radius;
+    }
+    fs := FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+        touch := TouchArea { mouse-cursor: pointer; clicked => { fs.focus(); root.clicked(); } }
+    }
     HorizontalLayout {
         padding-left: 14px;
         padding-right: 14px;
@@ -162,6 +180,63 @@ export component Icon inherits Image {
     in property <color> tone: Palette.foreground.with-alpha(0.62);
     colorize: root.tone;
     image-fit: contain;
+}
+
+// A square, borderless button with an icon from a file, `Family.control-height` high so it sits level with the other
+// controls of a row. Quiet until hovered; `danger` turns the icon red on hover (a delete button). The caller passes
+// `label` because an icon has no text for a screen reader.
+export component IconButton inherits Rectangle {
+    in property <image> glyph;
+    in property <string> label;
+    in property <bool> danger: false;
+    callback clicked();
+    width: Family.control-height;
+    height: Family.control-height;
+    border-radius: Family.control-radius;
+    background: touch.pressed ? Palette.foreground.with-alpha(0.16) : touch.has-hover ? Palette.foreground.with-alpha(0.1) : transparent;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+    Icon {
+        source: root.glyph;
+        width: 16px;
+        height: 16px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        tone: touch.has-hover && root.danger ? Family.danger : Palette.foreground.with-alpha(0.8);
+    }
+    if fs.has-focus: Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-width: 2px;
+        border-color: Palette.accent-background;
+        border-radius: Family.control-radius;
+    }
+    fs := FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+        touch := TouchArea { mouse-cursor: pointer; clicked => { fs.focus(); root.clicked(); } }
+    }
+}
+
+// Progress of a job, 0 to 1. Drawn by hand, in the info colour: Fluent's bar takes the accent, which is green on Mint
+// and reads as "done" next to a blue "Syncing…".
+export component ProgressBar inherits Rectangle {
+    in property <float> progress;
+    height: 4px;
+    border-radius: 2px;
+    background: Palette.foreground.with-alpha(0.1);
+    Rectangle {
+        x: 0px;
+        width: parent.width * clamp(root.progress, 0, 1);
+        border-radius: 2px;
+        background: Family.info;
+    }
 }
 
 // A small neutral label for a source or a category ("Flatpak"). A status uses a tinted chip instead, never this.

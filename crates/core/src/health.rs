@@ -1,8 +1,11 @@
 //! Disk health: kernel I/O errors, failed mounts, unclean shutdowns and SMART. Report only, nothing is repaired.
 //! Parsers take text so tests need no hardware.
-use std::{collections::HashMap, fs, io};
+use std::{collections::HashMap, fs, io, process::Command};
 
-use crate::services::{pkexec_output, run};
+use crate::{
+    apps::{command_read, run},
+    services::pkexec_output,
+};
 
 const SMARTCTL: &str = "/usr/sbin/smartctl";
 
@@ -24,9 +27,27 @@ pub struct Memory {
     pub watcher: String,
     /// "Out of memory" kills in the kernel log of this and the previous boot.
     pub oom_kills: u32,
+    /// Size of the zram swap in KiB (0 when there is none), and the machine's memory in KiB.
+    pub zram_kb: u64,
+    pub ram_kb: u64,
+}
+
+/// KiB of swap that lives in zram, from `/proc/swaps` (columns: name, type, size KiB, used, priority).
+pub fn zram_kb(swaps: &str) -> u64 {
+    swaps
+        .lines()
+        .skip(1)
+        .filter(|l| l.starts_with("/dev/zram"))
+        .filter_map(|l| l.split_whitespace().nth(2)?.parse::<u64>().ok())
+        .sum()
 }
 
 impl Memory {
+    /// zram below a quarter of the memory fills up fast; the old zram-tools default is a fixed 256 MiB.
+    pub fn zram_small(&self) -> bool {
+        self.zram_kb > 0 && self.zram_kb * 4 < self.ram_kb
+    }
+
     /// The bare gap: nothing to swap to and nothing watching.
     pub fn unprotected(&self) -> bool {
         self.swap.is_empty() && self.watcher.is_empty()
@@ -57,6 +78,8 @@ pub struct Health {
     pub backup: (i32, String),
     /// True when anything failed, including what was filed under a disk (the Boot page warns on it).
     pub problems: bool,
+    /// The kernel log could not be read in time: `errors` and the OOM count may be missing something.
+    pub log_unread: bool,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -199,7 +222,11 @@ fn parse_disks(lsblk: &str, fstab: &str, failed: &[String]) -> Vec<DiskInfo> {
     let fstab = parse_fstab(fstab);
     let get = |r: &HashMap<&str, String>, k: &str| r.get(k).cloned().unwrap_or_default();
     rows.iter()
-        .filter(|r| get(r, "TYPE") == "disk" && valid_disk(&get(r, "NAME")))
+        // zram/ram/nbd are virtual block devices: no SMART, not a disk to report on.
+        .filter(|r| {
+            let n = get(r, "NAME");
+            get(r, "TYPE") == "disk" && valid_disk(&n) && !["zram", "ram", "nbd"].iter().any(|p| n.starts_with(p))
+        })
         .map(|d| {
             let name = get(d, "NAME");
             let (tran, rota) = (get(d, "TRAN"), get(d, "ROTA"));
@@ -269,7 +296,12 @@ pub fn backup() -> (i32, String) {
 }
 
 pub fn scan() -> Health {
-    let mut errors = parse_kernel_errors(&run("journalctl", &["-k", "-b", "-o", "cat", "--no-pager"]));
+    // Read once for the I/O errors and the OOM count. A read that fails or times out is reported, never taken as
+    // "no errors": a slow journal is exactly what a failing disk causes.
+    let log = command_read(Command::new("journalctl").args(["-k", "-b", "-o", "cat", "--no-pager"]));
+    let log_unread = log.is_err();
+    let log = log.unwrap_or_default();
+    let mut errors = parse_kernel_errors(&log);
     let mut failed_mounts = parse_failed_mounts(&run(
         "systemctl",
         &["--failed", "--type=mount", "--plain", "--no-legend"],
@@ -291,14 +323,16 @@ pub fn scan() -> Health {
     let problems = !errors.is_empty() || !failed_mounts.is_empty();
     assign(&mut disks, &mut errors, &mut failed_mounts);
     let units = ["systemd-oomd", "earlyoom"];
+    let swaps = fs::read_to_string("/proc/swaps").unwrap_or_default();
     // `-b -1` is the boot that was reset; it needs the adm group or root, otherwise it is empty and counts as 0.
-    let oom_kills = count_oom(&run("journalctl", &["-k", "-b", "-o", "cat", "--no-pager"]))
-        + count_oom(&run("journalctl", &["-k", "-b", "-1", "-o", "cat", "--no-pager"]));
+    let oom_kills = count_oom(&log) + count_oom(&run("journalctl", &["-k", "-b", "-1", "-o", "cat", "--no-pager"]));
     Health {
         memory: Memory {
-            swap: crate::sysinfo::parse_swaps(&fs::read_to_string("/proc/swaps").unwrap_or_default()),
+            swap: crate::sysinfo::parse_swaps(&swaps),
             watcher: parse_active(&units, &run("systemctl", &["is-active", units[0], units[1]])),
             oom_kills,
+            zram_kb: zram_kb(&swaps),
+            ram_kb: crate::perf::parse_meminfo(&fs::read_to_string("/proc/meminfo").unwrap_or_default()).total_kb,
         },
         errors,
         failed_mounts,
@@ -306,6 +340,7 @@ pub fn scan() -> Health {
         disks,
         backup: backup(),
         problems,
+        log_unread,
     }
 }
 
@@ -388,6 +423,10 @@ pub fn smart(disk: &str) -> io::Result<Smart> {
             String::from_utf8_lossy(&out.stderr).trim().to_string() + " (is smartmontools installed?)",
         ));
     }
+    // No verdict line = unsupported device (virtual, some USB bridges): not a failing disk.
+    if !(text.contains("overall-health") || text.contains("Health Status")) {
+        return Err(io::Error::other("SMART is not available for this device"));
+    }
     Ok(parse_smart(&text))
 }
 
@@ -446,6 +485,24 @@ mod tests {
             1
         );
         assert!(Memory::default().unprotected());
+        let swaps =
+            "Filename Type Size Used Priority\n/dev/zram0 partition 262140 189248 100\n/swapfile file 1000 0 -2\n";
+        assert_eq!(zram_kb(swaps), 262140);
+        assert_eq!(zram_kb(""), 0);
+        let small = Memory {
+            zram_kb: 262140,
+            ram_kb: 38_000_000,
+            ..Memory::default()
+        };
+        assert!(small.zram_small());
+        assert!(
+            !Memory {
+                zram_kb: 9_500_000,
+                ..small
+            }
+            .zram_small()
+        );
+        assert!(!Memory::default().zram_small());
         assert!(
             !Memory {
                 swap: vec!["/swapfile".into()],
@@ -502,7 +559,8 @@ mod tests {
             NAME=\"sdb\" TYPE=\"disk\" PKNAME=\"\" SIZE=\"2T\" ROTA=\"1\" TRAN=\"usb\" MODEL=\"Elements\" UUID=\"\" PARTUUID=\"\" LABEL=\"\" MOUNTPOINT=\"\"\n\
             NAME=\"sdb1\" TYPE=\"part\" PKNAME=\"sdb\" SIZE=\"2T\" ROTA=\"1\" TRAN=\"\" MODEL=\"\" UUID=\"bbb\" PARTUUID=\"p2\" LABEL=\"Data\\x20Drive\" MOUNTPOINT=\"\"\n\
             NAME=\"sdb2\" TYPE=\"part\" PKNAME=\"sdb\" SIZE=\"1G\" ROTA=\"1\" TRAN=\"\" MODEL=\"\" UUID=\"ccc\" PARTUUID=\"p3\" LABEL=\"\" MOUNTPOINT=\"\"\n\
-            NAME=\"loop0\" TYPE=\"loop\" PKNAME=\"\" SIZE=\"4K\" ROTA=\"0\" TRAN=\"\" MODEL=\"\" UUID=\"\" PARTUUID=\"\" LABEL=\"\" MOUNTPOINT=\"/snap/x\"\n";
+            NAME=\"loop0\" TYPE=\"loop\" PKNAME=\"\" SIZE=\"4K\" ROTA=\"0\" TRAN=\"\" MODEL=\"\" UUID=\"\" PARTUUID=\"\" LABEL=\"\" MOUNTPOINT=\"/snap/x\"\n\
+            NAME=\"zram0\" TYPE=\"disk\" PKNAME=\"\" SIZE=\"7.8G\" ROTA=\"0\" TRAN=\"\" MODEL=\"\" UUID=\"\" PARTUUID=\"\" LABEL=\"\" MOUNTPOINT=\"[SWAP]\"\n";
         let fstab = "# comment\nUUID=aaa / ext4 defaults 0 1\nUUID=bbb /mnt/my\\040data ntfs defaults 0 0\n";
         let failed = vec!["/mnt/my data".to_string()];
         let d = parse_disks(lsblk, fstab, &failed);

@@ -2,7 +2,7 @@
 //! Trash, caches, the journal and Docker. Parsers take plain
 //! text so tests need no journalctl or docker. Every action re-checks the target before it writes.
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     ffi::OsString,
     fs, io,
     path::{Component, Path, PathBuf},
@@ -13,8 +13,15 @@ use std::{
 
 use walkdir::WalkDir;
 
+pub mod browsers;
+pub mod cargo;
+pub mod flatpak;
+mod steam;
+pub use steam::{Keep, Version};
+use steam::{all_old_versions, leftover_dirs, steam_games, steam_leftovers, steam_libraries, steam_roots};
+
 use crate::{
-    apps::{APT_GET, WALK_CAP, command_ok, now, parse_size, plain, trash_in, walk},
+    apps::{APT_GET, WALK_CAP, command_ok, command_read, now, parse_size, plain, trash_in, walk},
     services::{pkexec_output, pkexec_run},
 };
 
@@ -46,9 +53,6 @@ const BUILD_CAP: u32 = 1_000_000;
 const BIG_MIN: u64 = 100_000_000;
 const BIG_TOP: usize = 20;
 const FOLDER_TOP: usize = 10;
-/// Newest versions of a tool that are not listed as old.
-const KEEP_VERSIONS: usize = 2;
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Item {
     /// Full path for build output, a plain file or folder name for the others. The UI hands it back to the actions.
@@ -78,16 +82,20 @@ pub struct Mount {
 
 #[derive(Default, Debug)]
 pub struct Scan {
-    /// Steam, Heroic and Bottles games (`id` = name). Information only.
-    pub games: Vec<Item>,
     /// Every version of a tool (`id` = `tool/version`) with why it stays; only `Keep::No` can go to the Trash.
     pub old_versions: Vec<Version>,
+    /// Wine prefix and shader cache of an uninstalled Steam game (`id` = `#appid`, `path` = the prefix folder).
+    pub steam_leftovers: Vec<Item>,
     pub mounts: Vec<Mount>,
-    /// First-level folders of $HOME by size (`id` = folder name).
-    pub folders: Vec<Item>,
-    /// Biggest files in $HOME (`id` = full path).
-    pub big_files: Vec<Item>,
     pub builds: Vec<Item>,
+    /// `__pycache__` folders per project (`id` = `path` = the project folder, `size` = all its caches).
+    pub pycaches: Vec<Item>,
+    /// Cache, crash reports and AI models per installed browser (`id` = browser id, `path` = its profile folder).
+    pub browsers: Vec<Item>,
+    /// Cargo's registry source, registry downloads and git checkouts (`id` as in `cargo::FOLDERS`, `newest` = last use).
+    pub cargo: Vec<Item>,
+    /// `~/.var/app/<id>/cache` of Flatpak apps (`id` = app id, `path` = the cache folder), 1 MB and up.
+    pub flatpak_caches: Vec<Item>,
     pub installers: Vec<Item>,
     pub caches: Vec<Item>,
     /// Home Trash entries deleted more than `usage_days` days ago (`id` = name in `Trash/files`, `newest` = deletion).
@@ -95,6 +103,9 @@ pub struct Scan {
     pub trash_size: u64,
     pub trash_count: usize,
     pub journal: u64,
+    pub coredumps: Coredumps,
+    /// Size and count of the rotated logs in `/var/log`.
+    pub rotated_logs: (u64, usize),
     /// Package files APT keeps in `/var/cache/apt/archives`.
     pub apt_cache: u64,
     /// Timeshift snapshot names (their dates), oldest first. Empty when Timeshift is absent or its folder is not readable.
@@ -144,10 +155,16 @@ fn trash_info(home: &Path) -> PathBuf {
 fn trash_date(info: &str) -> Option<u64> {
     let v = info.lines().find_map(|l| l.strip_prefix("DeletionDate="))?.trim();
     let (d, t) = v.split_once('T')?;
+    stamp(d, t, '-', ':')
+}
+
+/// `2026-11-09` + `11:17:04` (separators given) as epoch seconds, local time read as UTC. Shared by Trash dates and
+/// Timeshift snapshot names (`2026-11-09_11-17-04`).
+fn stamp(d: &str, t: &str, dsep: char, tsep: char) -> Option<u64> {
     let num = |s: &str| s.parse::<i64>().ok();
-    let mut d = d.split('-').map(num);
+    let mut d = d.split(dsep).map(num);
     let (y, m, day) = (d.next()??, d.next()??, d.next()??);
-    let mut t = t.split(':').map(num);
+    let mut t = t.split(tsep).map(num);
     let (h, mi, s) = (t.next()??, t.next()??, t.next()??);
     if !(1..=12).contains(&m) || !(1..=31).contains(&day) || !(0..24).contains(&h) || !(0..60).contains(&mi) {
         return None;
@@ -213,7 +230,9 @@ pub fn delete_trash_entry(home: &Path, name: &str, days: u32) -> io::Result<()> 
     match fs::symlink_metadata(&path) {
         Ok(m) if m.is_dir() => fs::remove_dir_all(&path)?,
         Ok(_) => fs::remove_file(&path)?,
-        Err(_) => {}
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        // Any other error: keep the .trashinfo, or the file is left in Trash with no record.
+        Err(e) => return Err(e),
     }
     fs::remove_file(info)
 }
@@ -235,6 +254,12 @@ fn root_step(action: i32) -> Option<String> {
         3 => format!("{APT_GET} autoremove -y"),
         16 => format!("{APT_GET} clean"),
         10 => format!("{JOURNALCTL} --vacuum-size=100M"),
+        // `\*` stays literal inside the single quotes of the shown command and reaches `find` as `*`.
+        22 => format!("/usr/bin/find {COREDUMP_DIR} -maxdepth 1 -type f -name core.\\* -delete"),
+        // Must select the same names as `is_rotated`. Same shell escaping as step 22.
+        24 => format!(
+            "/usr/bin/find {LOG_DIR} -maxdepth {LOG_DEPTH} -type f \\( -name \\*.gz -o -name \\*.xz -o -name \\*.\\[0-9\\] -o -name \\*.\\[0-9\\]\\[0-9\\] \\) -delete"
+        ),
         _ => return None,
     })
 }
@@ -303,17 +328,58 @@ pub fn run_root(actions: &[i32]) -> Vec<(i32, io::Result<()>)> {
     }
 }
 
-/// `target/` next to a Cargo.toml, `node_modules/` next to a package.json. Anything else with that name is not ours.
+/// What a Python project keeps next to its venv, so something can recreate it.
+const VENV_MANIFESTS: [&str; 5] = ["pyproject.toml", "requirements.txt", "setup.py", "setup.cfg", "Pipfile"];
+
+/// `target/` next to a Cargo.toml, `node_modules/` next to a package.json, a venv (`pyvenv.cfg` inside) next to a
+/// Python project file. Anything else with that name is not ours.
 fn is_build(path: &Path) -> bool {
-    let manifest = match path.file_name().and_then(|n| n.to_str()) {
-        Some("target") => "Cargo.toml",
-        Some("node_modules") => "package.json",
+    let manifests: &[&str] = match path.file_name().and_then(|n| n.to_str()) {
+        Some("target") => &["Cargo.toml"],
+        Some("node_modules") => &["package.json"],
+        Some(".venv" | "venv" | "env") if path.join("pyvenv.cfg").is_file() => &VENV_MANIFESTS,
         _ => return false,
     };
-    path.parent().is_some_and(|p| p.join(manifest).is_file())
+    path.parent()
+        .is_some_and(|p| manifests.iter().any(|m| p.join(m).is_file()))
 }
 
-fn builds(home: &Path, excluded: &[PathBuf], cancel: &AtomicBool) -> Vec<Item> {
+const PROJECT_MARKERS: [&str; 5] = ["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", ".git"];
+
+/// A `__pycache__` that holds only `.pyc` files: Python rebuilds those, so anything else in there is not ours to delete.
+fn is_pycache(path: &Path) -> bool {
+    path.file_name().is_some_and(|n| n == "__pycache__")
+        && fs::read_dir(path).is_ok_and(|mut r| {
+            r.all(|e| {
+                e.is_ok_and(|e| {
+                    e.file_type().is_ok_and(|t| t.is_file()) && e.path().extension().is_some_and(|x| x == "pyc")
+                })
+            })
+        })
+}
+
+/// Never entered when looking for caches: hidden folders, and the installed packages of any venv or system Python
+/// (`site-packages`), whose caches belong to no project of yours.
+fn is_skipped_dir(name: &std::ffi::OsStr) -> bool {
+    let name = name.to_string_lossy();
+    name.starts_with('.') || name == "site-packages" || name == "dist-packages"
+}
+
+/// The project a cache folder belongs to: the nearest folder below `home` with a project marker, else its parent.
+/// `None` when that would be `home` itself (a cache right in $HOME is not a project).
+fn pycache_project(home: &Path, cache: &Path) -> Option<PathBuf> {
+    let parent = cache.parent()?;
+    let found = parent
+        .ancestors()
+        .take_while(|a| *a != home)
+        .find(|a| PROJECT_MARKERS.iter().any(|m| a.join(m).exists()));
+    let project = found.unwrap_or(parent);
+    (project != home && project.starts_with(home)).then(|| project.to_path_buf())
+}
+
+/// Build folders, and the projects' `__pycache__` folders grouped per project (one row each, never one per file).
+fn builds(home: &Path, excluded: &[PathBuf], cancel: &AtomicBool) -> (Vec<Item>, Vec<Item>) {
+    let mut caches = HashMap::<PathBuf, (u64, Option<u64>)>::new();
     let (mut out, mut visits) = (Vec::new(), BUILD_CAP);
     let mut it = WalkDir::new(home).same_file_system(true).into_iter();
     while let Some(entry) = it.next() {
@@ -326,8 +392,8 @@ fn builds(home: &Path, excluded: &[PathBuf], cancel: &AtomicBool) -> Vec<Item> {
         if e.depth() == 0 || !e.file_type().is_dir() {
             continue;
         }
-        let hidden = e.file_name().to_string_lossy().starts_with('.');
-        if hidden || excluded.iter().any(|x| e.path().starts_with(x)) {
+        // `is_build` comes before the hidden check so a `.venv` is found; hidden folders are otherwise never entered.
+        if excluded.iter().any(|x| e.path().starts_with(x)) {
             it.skip_current_dir();
         } else if is_build(e.path()) {
             let (size, newest) = walk(e.path(), &mut WALK_CAP.clone());
@@ -338,10 +404,69 @@ fn builds(home: &Path, excluded: &[PathBuf], cancel: &AtomicBool) -> Vec<Item> {
                 ..Default::default()
             });
             it.skip_current_dir();
+        } else if is_skipped_dir(e.file_name()) {
+            it.skip_current_dir();
+        } else if is_pycache(e.path()) {
+            if let Some(project) = pycache_project(home, e.path()) {
+                let (size, newest) = walk(e.path(), &mut WALK_CAP.clone());
+                let slot = caches.entry(project).or_default();
+                slot.0 += size;
+                slot.1 = slot.1.max(newest);
+            }
+            it.skip_current_dir();
         }
     }
     out.sort_by_key(|i| std::cmp::Reverse(i.size));
-    out
+    let mut pycaches: Vec<Item> = caches
+        .into_iter()
+        .map(|(p, (size, newest))| {
+            let id = p.to_string_lossy().into_owned();
+            Item {
+                path: id.clone(),
+                id,
+                size,
+                newest,
+            }
+        })
+        .collect();
+    pycaches.sort_by_key(|i| std::cmp::Reverse(i.size));
+    (out, pycaches)
+}
+
+/// Delete the `.pyc`-only `__pycache__` folders of a project found by the scan. Re-checked: inside `home`, not a
+/// link, and only folders that still hold nothing but `.pyc` files go (permanent, Python rebuilds them).
+pub fn clear_pycaches(home: &Path, project: &str) -> io::Result<()> {
+    let p = Path::new(project);
+    let clean =
+        p.is_absolute() && p != home && p.starts_with(home) && !p.components().any(|c| c == Component::ParentDir);
+    if !(clean && fs::symlink_metadata(p).is_ok_and(|m| m.is_dir())) {
+        return Err(io::Error::other("not a project folder any more, scan again"));
+    }
+    let (mut removed, mut visits) = (0, BUILD_CAP);
+    let mut it = WalkDir::new(p).same_file_system(true).into_iter();
+    while let Some(Ok(e)) = it.next() {
+        if visits == 0 {
+            break;
+        }
+        visits -= 1;
+        if !e.file_type().is_dir() {
+            continue;
+        }
+        if e.depth() > 0 && (is_skipped_dir(e.file_name()) || is_build(e.path())) {
+            it.skip_current_dir();
+        } else if is_pycache(e.path()) {
+            // Only the caches the scan counted for this project: a nested project's are its own row.
+            if pycache_project(home, e.path()).as_deref() == Some(p) {
+                fs::remove_dir_all(e.path())?;
+                removed += 1;
+            }
+            it.skip_current_dir();
+        }
+    }
+    if removed == 0 {
+        return Err(io::Error::other("nothing to clear any more, scan again"));
+    }
+    Ok(())
 }
 
 fn is_installer(name: &str) -> bool {
@@ -378,6 +503,8 @@ fn caches(dir: &Path) -> Vec<Item> {
         .flatten()
         .flatten()
         .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+        // The browsers have their own row (it refuses while the browser is open), so they are not counted twice.
+        .filter(|e| !browsers::CACHE_FOLDERS.contains(&e.file_name().to_string_lossy().as_ref()))
         .map(|e| {
             let (size, newest) = walk(&e.path(), &mut WALK_CAP.clone());
             Item {
@@ -592,6 +719,51 @@ fn last_logged_in(dir: &Path) -> Option<String> {
     })
 }
 
+/// Snapshots are only offered for deletion when older than this and not among the newest `SNAP_KEEP_NEWEST`.
+pub const SNAP_KEEP_DAYS: u32 = 180;
+pub const SNAP_KEEP_NEWEST: usize = 3;
+
+/// Epoch seconds of a snapshot name (`2026-11-09_11-17-04`); `None` for anything else, so odd folders are never old.
+fn snapshot_time(name: &str) -> Option<u64> {
+    let (d, t) = name.split_once('_')?;
+    let digits = |s: &str, sep: char| {
+        s.split(sep)
+            .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
+    };
+    (name.len() == 19 && digits(d, '-') && digits(t, '-')).then_some(())?;
+    stamp(d, t, '-', '-')
+}
+
+/// For each name (oldest first): true when it must be kept (one of the newest 3, younger than 6 months, or not a date).
+pub fn snapshot_keep(names: &[String], now: u64) -> Vec<bool> {
+    let cutoff = old_cutoff(now, SNAP_KEEP_DAYS);
+    let first_newest = names.len().saturating_sub(SNAP_KEEP_NEWEST);
+    names
+        .iter()
+        .enumerate()
+        .map(|(i, n)| i >= first_newest || !snapshot_time(n).is_some_and(|s| s <= cutoff))
+        .collect()
+}
+
+pub const TIMESHIFT: &str = "/usr/bin/timeshift";
+
+/// Deletes one old snapshot with Timeshift itself (it knows rsync hard links, btrfs and the backup device). The name
+/// goes to a root command, so it must be a plain date; age and rank are checked again against the current list.
+pub fn delete_snapshot(name: &str) -> io::Result<()> {
+    let old = snapshot_time(name).is_some_and(|s| s <= cutoff(SNAP_KEEP_DAYS));
+    let names = timeshift_snapshots();
+    // shortcut: the folder is usually root-only, so without a readable list only the age is re-checked (the newest-3
+    // rule was applied when the list was shown); upgrade if Timeshift ever becomes readable for users.
+    let newest = names
+        .iter()
+        .position(|n| n == name)
+        .is_some_and(|i| snapshot_keep(&names, now())[i]);
+    if !old || newest {
+        return Err(io::Error::other("not an old snapshot any more, scan again"));
+    }
+    pkexec_run(TIMESHIFT, &["--delete", "--snapshot", name, "--scripted"])
+}
+
 /// Snapshot folder names, oldest first. Names only: rsync snapshots are hard-linked, so a size per snapshot would be
 /// wrong and walking them is very slow.
 pub(crate) fn snapshot_names(dir: &Path) -> Vec<String> {
@@ -622,8 +794,96 @@ fn parse_journal(text: &str) -> u64 {
     (n.parse::<f64>().unwrap_or(0.0) * scale as f64) as u64
 }
 
+const COREDUMP_DIR: &str = "/var/lib/systemd/coredump";
+
+/// The crash dumps `systemd-coredump` keeps: their total size, how many, and the program that crashed most.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Coredumps {
+    pub size: u64,
+    pub count: usize,
+    pub top: String,
+}
+
+/// `core.<program>.<uid>.<boot id>.<pid>.<time>[.zst|.xz|.lz4]` -> `<program>`. The program may hold dots, the five
+/// fields after it never do, so they are counted from the end.
+fn dump_program(name: &str) -> Option<&str> {
+    let rest = name.strip_prefix("core.")?;
+    let rest = [".zst", ".xz", ".lz4"]
+        .iter()
+        .find_map(|e| rest.strip_suffix(e))
+        .unwrap_or(rest);
+    let mut parts = rest.rsplitn(5, '.');
+    (parts.by_ref().take(4).count() == 4).then_some(())?;
+    parts.next().filter(|p| !p.is_empty())
+}
+
+/// The dump folder is listable without root (its files are not readable, but their sizes are).
+fn coredumps(dir: &Path) -> Coredumps {
+    let mut per = HashMap::<String, usize>::new();
+    let mut out = Coredumps::default();
+    for e in fs::read_dir(dir).into_iter().flatten().flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let Some(program) = dump_program(&name) else { continue };
+        let Ok(meta) = e.metadata() else { continue };
+        if meta.is_file() {
+            out.size += meta.len();
+            out.count += 1;
+            *per.entry(program.to_string()).or_default() += 1;
+        }
+    }
+    // Ties go to the name that sorts first, so the label does not change between scans.
+    out.top = per
+        .into_iter()
+        .max_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(&a.0)))
+        .map(|p| p.0)
+        .unwrap_or_default();
+    out
+}
+
+const LOG_DIR: &str = "/var/log";
+/// `/var/log/apt/history.log.1.gz` is two levels down; deeper folders are not logrotate's.
+const LOG_DEPTH: usize = 3;
+
+/// What logrotate leaves behind: `syslog.1`, `syslog.2.gz`, `auth.log.10`, `*.xz`. The live `syslog` never matches.
+fn is_rotated(name: &str) -> bool {
+    let Some((stem, ext)) = name.rsplit_once('.') else {
+        return false;
+    };
+    matches!(ext, "gz" | "xz")
+        || (!stem.is_empty() && (1..=2).contains(&ext.len()) && ext.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// Size and count of the rotated logs, readable without root (folders list, sizes are metadata).
+fn rotated_logs(dir: &Path) -> (u64, usize) {
+    walkdir::WalkDir::new(dir)
+        .max_depth(LOG_DEPTH)
+        .into_iter()
+        .flatten()
+        .filter(|e| e.file_type().is_file() && is_rotated(&e.file_name().to_string_lossy()))
+        .filter_map(|e| e.metadata().ok())
+        .fold((0, 0), |(s, n), m| (s + m.len(), n + 1))
+}
+
+pub fn rotated_log_bytes() -> u64 {
+    rotated_logs(Path::new(LOG_DIR)).0
+}
+
+/// Deletes the rotated logs, in the same root script the bulk dialog shows (step 24).
+pub fn clear_rotated_logs() -> io::Result<()> {
+    run_root(&[24]).pop().map_or(Ok(()), |r| r.1)
+}
+
+pub fn coredump_bytes() -> u64 {
+    coredumps(Path::new(COREDUMP_DIR)).size
+}
+
+/// Deletes every dump, in the same root script the bulk dialog shows (step 22).
+pub fn clear_coredumps() -> io::Result<()> {
+    run_root(&[22]).pop().map_or(Ok(()), |r| r.1)
+}
+
 pub fn journal_usage() -> u64 {
-    command_ok(Command::new("journalctl").arg("--disk-usage")).map_or(0, |t| parse_journal(&t))
+    command_read(Command::new("journalctl").arg("--disk-usage")).map_or(0, |t| parse_journal(&t))
 }
 
 /// Lines of `docker system df --format '{{json .}}'`.
@@ -646,7 +906,7 @@ fn parse_docker(text: &str) -> Vec<DockerRow> {
 }
 
 pub fn docker_usage() -> Vec<DockerRow> {
-    command_ok(Command::new("docker").args(["system", "df", "--format", "{{json .}}"]))
+    command_read(Command::new("docker").args(["system", "df", "--format", "{{json .}}"]))
         .map_or(vec![], |t| parse_docker(&t))
 }
 
@@ -656,8 +916,10 @@ fn parse_df(text: &str) -> Vec<Mount> {
         .filter_map(|l| {
             let f: Vec<&str> = l.split_whitespace().collect();
             let (total, used) = (f.get(1)?.parse().ok()?, f.get(2)?.parse().ok()?);
-            (f.len() >= 6 && total > 0).then(|| Mount {
-                path: f[5..].join(" "),
+            let path = f.get(5..)?.join(" ");
+            // Running AppImages mount a read-only image (always 100%) and /sys holds firmware variables: not disks.
+            (total > 0 && !path.starts_with("/tmp/.mount_") && !path.starts_with("/sys/")).then_some(Mount {
+                path,
                 total,
                 used,
             })
@@ -669,7 +931,11 @@ fn mounts() -> Vec<Mount> {
     let args = [
         "-P", "-B1", "-x", "tmpfs", "-x", "devtmpfs", "-x", "squashfs", "-x", "overlay",
     ];
-    command_ok(Command::new("df").args(args)).map_or(vec![], |t| parse_df(&t))
+    // A dead network share (NAS asleep, NFS gone) makes `df` hang until it is killed. Then ask again for local disks
+    // only, so the real disks still show.
+    command_read(Command::new("df").args(args))
+        .or_else(|_| command_read(Command::new("df").arg("-l").args(args)))
+        .map_or(vec![], |t| parse_df(&t))
 }
 
 /// Biggest first, at most `n`.
@@ -729,78 +995,6 @@ fn home_usage(home: &Path, excluded: &[PathBuf], big_min: u64, cancel: &AtomicBo
     (folders, big)
 }
 
-/// Values of every `"key"<tabs>"value"` line in a Steam VDF/ACF file.
-fn parse_vdf_values(text: &str, key: &str) -> Vec<String> {
-    text.lines()
-        .filter_map(|l| {
-            let parts: Vec<&str> = l.trim().split('"').collect();
-            (parts.len() >= 4 && parts[1] == key).then(|| parts[3].to_string())
-        })
-        .collect()
-}
-
-/// Steam installs found, resolved so `~/.steam/steam` and the folder it links to count once.
-fn steam_roots(home: &Path) -> Vec<PathBuf> {
-    let mut roots: Vec<PathBuf> = [
-        ".steam/steam",
-        ".local/share/Steam",
-        ".var/app/com.valvesoftware.Steam/.local/share/Steam",
-    ]
-    .iter()
-    .filter_map(|r| fs::canonicalize(home.join(r)).ok())
-    .collect();
-    roots.sort();
-    roots.dedup();
-    roots
-}
-
-/// Every library of the given Steam installs. One on a drive that is not mounted is skipped.
-fn steam_libraries(roots: &[PathBuf]) -> Vec<PathBuf> {
-    let mut libs = roots.to_vec();
-    for root in roots {
-        let text = fs::read_to_string(root.join("steamapps/libraryfolders.vdf")).unwrap_or_default();
-        libs.extend(
-            parse_vdf_values(&text, "path")
-                .iter()
-                .filter_map(|p| fs::canonicalize(p).ok()),
-        );
-    }
-    libs.sort();
-    libs.dedup();
-    libs
-}
-
-/// Installed Steam games with the size Steam recorded, so no folder is walked.
-fn steam_games(libs: &[PathBuf]) -> Vec<Item> {
-    libs.iter()
-        .flat_map(|lib| {
-            let apps = lib.join("steamapps");
-            fs::read_dir(&apps)
-                .into_iter()
-                .flatten()
-                .flatten()
-                .filter_map(move |e| {
-                    let file = e.file_name().to_string_lossy().into_owned();
-                    if !(file.starts_with("appmanifest_") && file.ends_with(".acf")) {
-                        return None;
-                    }
-                    let text = fs::read_to_string(e.path()).ok()?;
-                    let first = |k| parse_vdf_values(&text, k).into_iter().next();
-                    Some(Item {
-                        id: first("name")?,
-                        size: first("SizeOnDisk").and_then(|s| s.parse().ok()).unwrap_or(0),
-                        path: apps
-                            .join("common")
-                            .join(first("installdir")?)
-                            .to_string_lossy()
-                            .into_owned(),
-                        ..Default::default()
-                    })
-                })
-        })
-        .collect()
-}
-
 /// Sub-folders of `dir` (a Heroic games folder, Bottles' bottles) as `label/name`, sized by walking them.
 fn child_folders(dir: &Path, label: &str) -> Vec<Item> {
     fs::read_dir(dir)
@@ -830,223 +1024,6 @@ fn games(home: &Path, libs: &[PathBuf]) -> Vec<Item> {
     out
 }
 
-/// Why a version is, or is not, offered for the Trash. The numbers are what the UI row reads.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Keep {
-    No = 0,
-    /// One of the newest `KEEP_VERSIONS`.
-    Newest = 1,
-    /// A game in Steam's `CompatToolMapping` runs on it.
-    InUse = 2,
-    /// A Steam tool app: Steam keeps its `appmanifest`, so only Steam can uninstall it cleanly.
-    Steam = 3,
-    /// Steam's default tool, for every game without its own.
-    Default = 4,
-}
-
-/// A version of a tool, why it stays and, for Steam tools, the games set to run on it.
-#[derive(Clone, Debug)]
-pub struct Version {
-    pub item: Item,
-    pub keep: Keep,
-    pub games: Vec<String>,
-}
-
-/// `(app id, tool name lowercase)` of every entry of `CompatToolMapping` in `config.vdf`. App id "0" is the default
-/// tool for games without their own. Stale entries (game or tool gone) are still returned, so they count as in use.
-/// shortcut: line-based scan of Valve's text format, when a name spans lines or a value has `"` read it with a vdf parser.
-fn parse_tool_map(text: &str) -> Vec<(String, String)> {
-    let mut map = Vec::new();
-    let Some(start) = text.find("\"CompatToolMapping\"") else {
-        return map;
-    };
-    let (mut depth, mut appid) = (0, "");
-    for line in text[start..].lines().map(str::trim) {
-        match line {
-            "{" => depth += 1,
-            "}" => {
-                depth -= 1;
-                if depth <= 0 {
-                    break;
-                }
-            }
-            _ if depth == 1 => appid = line.trim_matches('"'),
-            _ if depth == 2 && line.starts_with("\"name\"") => {
-                if let Some(v) = line["\"name\"".len()..]
-                    .trim()
-                    .strip_prefix('"')
-                    .and_then(|v| v.strip_suffix('"'))
-                {
-                    map.push((appid.to_string(), v.to_lowercase()));
-                }
-            }
-            _ => {}
-        }
-    }
-    map
-}
-
-/// App ids Steam lists as installed, in every library of `libraryfolders.vdf` (also those on drives not mounted now).
-fn parse_installed_ids(text: &str) -> Vec<String> {
-    let mut ids = Vec::new();
-    let mut in_apps = false;
-    for line in text.lines().map(str::trim) {
-        match line {
-            "\"apps\"" => in_apps = true,
-            "}" => in_apps = false,
-            _ if in_apps && line != "{" => ids.extend(line.split('"').nth(1).map(String::from)),
-            _ => {}
-        }
-    }
-    ids
-}
-
-/// Installed Steam games by app id, for naming who uses a tool.
-fn steam_app_names(libs: &[PathBuf]) -> HashMap<String, String> {
-    let mut names = HashMap::new();
-    for e in libs
-        .iter()
-        .flat_map(|l| fs::read_dir(l.join("steamapps")).into_iter().flatten().flatten())
-    {
-        if !e.file_name().to_string_lossy().starts_with("appmanifest_") {
-            continue;
-        }
-        let text = fs::read_to_string(e.path()).unwrap_or_default();
-        let first = |k| parse_vdf_values(&text, k).into_iter().next();
-        if let (Some(id), Some(name)) = (first("appid"), first("name")) {
-            names.insert(id, name);
-        }
-    }
-    names
-}
-
-/// Steam's name for an official Proton folder: `Proton 9.0 (Beta)` is `proton_9`, `Proton 6.3` is `proton_63`.
-fn proton_name(dir: &str) -> String {
-    let d = dir.to_lowercase();
-    for word in ["experimental", "hotfix"] {
-        if d.contains(word) {
-            return format!("proton_{word}");
-        }
-    }
-    let ver: String = d
-        .trim_start_matches("proton")
-        .trim()
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.')
-        .collect();
-    format!("proton_{}", ver.trim_end_matches(".0").replace('.', ""))
-}
-
-/// Entries of `dir` whose name starts with `prefix`, newest first; links are skipped (`GE-Proton-latest`).
-/// The newest `KEEP_VERSIONS` and those `users` names games for get a `Keep` reason, `managed` ones that are left get
-/// `Keep::Steam`. `users` gives the games of a folder name; an empty name stands for Steam's default tool.
-/// shortcut: "newest" is the folder's mtime, not the version in use, when it misleads read the launcher's link.
-fn old_versions(
-    dir: &Path,
-    prefix: &str,
-    label: &str,
-    users: &dyn Fn(&str) -> Vec<String>,
-    managed: bool,
-) -> Vec<Version> {
-    let mut found: Vec<(u64, PathBuf)> = fs::read_dir(dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter(|e| e.file_name().to_string_lossy().starts_with(prefix))
-        .filter_map(|e| {
-            let meta = fs::symlink_metadata(e.path()).ok().filter(|m| m.is_dir())?;
-            let secs = meta.modified().ok()?.duration_since(UNIX_EPOCH).ok()?.as_secs();
-            Some((secs, e.path()))
-        })
-        .collect();
-    found.sort_by_key(|(secs, _)| std::cmp::Reverse(*secs));
-    found
-        .into_iter()
-        .enumerate()
-        .map(|(n, (secs, path))| {
-            let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
-            let (default, games): (Vec<String>, Vec<String>) = users(&name).into_iter().partition(String::is_empty);
-            let keep = match () {
-                _ if !default.is_empty() => Keep::Default,
-                _ if !games.is_empty() => Keep::InUse,
-                _ if n < KEEP_VERSIONS => Keep::Newest,
-                _ if managed => Keep::Steam,
-                _ => Keep::No,
-            };
-            let item = Item {
-                id: format!("{label}/{name}"),
-                size: walk(&path, &mut WALK_CAP.clone()).0,
-                newest: Some(secs),
-                path: path.to_string_lossy().into_owned(),
-            };
-            Version { item, keep, games }
-        })
-        .collect()
-}
-
-/// Folders that hold several versions of one tool: `~/.local/share/<tool>/versions`, Steam's compatibility tools and
-/// Proton, rustup toolchains. Biggest first.
-fn all_old_versions(home: &Path, libs: &[PathBuf], roots: &[PathBuf]) -> Vec<Version> {
-    let names = steam_app_names(libs);
-    let installed: HashSet<String> = roots
-        .iter()
-        .filter_map(|r| fs::read_to_string(r.join("steamapps/libraryfolders.vdf")).ok())
-        .flat_map(|t| parse_installed_ids(&t))
-        .collect();
-    let mut used = HashMap::<String, Vec<String>>::new();
-    for (appid, tool) in roots
-        .iter()
-        .filter_map(|r| fs::read_to_string(r.join("config/config.vdf")).ok())
-        .flat_map(|t| parse_tool_map(&t))
-    {
-        // Steam keeps a game's tool after it is uninstalled; that game no longer needs it. Without the list, trust all.
-        if appid != "0" && !installed.is_empty() && !installed.contains(&appid) {
-            continue;
-        }
-        // Installed on a drive that is not mounted: no manifest to read the name from, so the app id stands in.
-        let who = match appid.as_str() {
-            "0" => String::new(),
-            _ => names.get(&appid).cloned().unwrap_or_else(|| format!("#{appid}")),
-        };
-        used.entry(tool).or_default().push(who);
-    }
-    let games = |tool: &str| used.get(tool).cloned().unwrap_or_default();
-    let mut out = Vec::new();
-    for e in fs::read_dir(home.join(".local/share")).into_iter().flatten().flatten() {
-        let tool = e.file_name().to_string_lossy().into_owned();
-        out.extend(old_versions(&e.path().join("versions"), "", &tool, &|_| vec![], false));
-    }
-    out.extend(old_versions(
-        &home.join(".rustup/toolchains"),
-        "",
-        "rustup",
-        &|_| vec![],
-        false,
-    ));
-    for root in roots {
-        let dir = root.join("compatibilitytools.d");
-        // shortcut: the folder name stands for the tool's internal name (compatibilitytool.vdf), true for GE-Proton.
-        out.extend(old_versions(
-            &dir,
-            "",
-            "Steam tools",
-            &|n| games(&n.to_lowercase()),
-            false,
-        ));
-    }
-    for lib in libs {
-        out.extend(old_versions(
-            &lib.join("steamapps/common"),
-            "Proton",
-            "Proton",
-            &|n| games(&proton_name(n)),
-            true,
-        ));
-    }
-    out.sort_by_key(|v| std::cmp::Reverse(v.item.size));
-    out
-}
-
 /// What the Open button shows for a path from a row: a file opens its folder. Absolute, no `..`, must exist.
 pub fn open_target(path: &str) -> Option<PathBuf> {
     let p = Path::new(path);
@@ -1066,26 +1043,39 @@ fn tree_size(dir: &Path) -> (u64, usize) {
     (walk(dir, &mut WALK_CAP.clone()).0, count)
 }
 
+/// The "Look only" tab, run on request because it walks all of $HOME: first-level folders by size, files of
+/// `BIG_MIN` and up, and the game libraries. Returns `(folders, big_files, games)`.
+pub fn look(home: &Path, excluded: &[String], cancel: &AtomicBool) -> (Vec<Item>, Vec<Item>, Vec<Item>) {
+    let excluded: Vec<PathBuf> = excluded.iter().map(PathBuf::from).collect();
+    let (folders, big_files) = home_usage(home, &excluded, BIG_MIN, cancel);
+    let games = games(home, &steam_libraries(&steam_roots(home)));
+    (folders, big_files, games)
+}
+
 /// `cancel` is polled between entries; what was found so far is returned.
 pub fn scan(home: &Path, usage_days: u32, excluded: &[String], cancel: &AtomicBool) -> Scan {
     let excluded: Vec<PathBuf> = excluded.iter().map(PathBuf::from).collect();
     let (trash_size, trash_count) = tree_size(&trash_files(home));
-    let (folders, big_files) = home_usage(home, &excluded, BIG_MIN, cancel);
     let roots = steam_roots(home);
     let libs = steam_libraries(&roots);
+    let (builds, pycaches) = builds(home, &excluded, cancel);
     Scan {
-        games: games(home, &libs),
         old_versions: all_old_versions(home, &libs, &roots),
+        steam_leftovers: steam_leftovers(&roots, &libs),
         mounts: mounts(),
-        folders,
-        big_files,
-        builds: builds(home, &excluded, cancel),
+        builds,
+        pycaches,
+        browsers: browsers::scan(home),
+        cargo: cargo::scan(home),
+        flatpak_caches: flatpak::scan(home),
         installers: installers(&downloads(home), now(), usage_days),
         caches: caches(&cache_dir(home)),
         old_trash: old_trash(home, now(), usage_days),
         trash_size,
         trash_count,
         journal: journal_usage(),
+        coredumps: coredumps(Path::new(COREDUMP_DIR)),
+        rotated_logs: rotated_logs(Path::new(LOG_DIR)),
         apt_cache: apt_cache_size(Path::new("/var/cache/apt/archives")),
         snapshots: timeshift_snapshots(),
         timeshift: Path::new("/etc/timeshift/timeshift.json").exists(),
@@ -1127,6 +1117,30 @@ pub fn trash_old_version(home: &Path, path: &str) -> io::Result<()> {
         return Err(io::Error::other("not an old version any more, scan again"));
     }
     command_ok(Command::new("gio").args(["trash", "--"]).arg(path)).map(drop)
+}
+
+/// The folders `gio trash` takes for a leftover row: its prefix and shader cache (`path` = `<steamapps>/<dir>/<appid>`).
+pub fn steam_leftover_paths(path: &str) -> Vec<PathBuf> {
+    let p = Path::new(path);
+    match (
+        p.parent().and_then(Path::parent),
+        p.file_name().and_then(|n| n.to_str()),
+    ) {
+        (Some(steamapps), Some(id)) if p.is_absolute() => leftover_dirs(steamapps, id),
+        _ => Vec::new(),
+    }
+}
+
+/// A Steam leftover found by the scan: listed again so only a row the scan would show can go, never a made-up path.
+/// Both folders of the app id go to the Trash together, so the saves in the prefix stay recoverable.
+pub fn trash_steam_leftover(home: &Path, path: &str) -> io::Result<()> {
+    let roots = steam_roots(home);
+    let libs = steam_libraries(&roots);
+    let paths = steam_leftover_paths(path);
+    if paths.is_empty() || !steam_leftovers(&roots, &libs).iter().any(|i| i.path == path) {
+        return Err(io::Error::other("not a Steam leftover any more, scan again"));
+    }
+    command_ok(Command::new("gio").args(["trash", "--"]).args(paths)).map(drop)
 }
 
 pub fn trash_installer(home: &Path, file: &str) -> io::Result<()> {
@@ -1244,6 +1258,47 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_keep_rule() {
+        let now = stamp("2026-11-13", "00:00:00", '-', ':').unwrap();
+        let v = |l: &[&str]| l.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // 1 year, 8 months, 2 months, 3 weeks, 1 week ago: only the two oldest go.
+        let names = v(&[
+            "2025-11-10_10-00-00",
+            "2026-03-01_10-00-00",
+            "2026-09-10_10-00-00",
+            "2026-10-20_10-00-00",
+            "2026-11-06_10-00-00",
+        ]);
+        assert_eq!(snapshot_keep(&names, now), [false, false, true, true, true]);
+        // The newest 3 stay even when ancient.
+        let old = v(&[
+            "2020-01-01_00-00-00",
+            "2020-02-01_00-00-00",
+            "2020-03-01_00-00-00",
+            "2020-04-01_00-00-00",
+        ]);
+        assert_eq!(snapshot_keep(&old, now), [false, true, true, true]);
+        // Not a date: kept.
+        assert_eq!(snapshot_keep(&v(&["a", "b", "c", "weird"]), now), [true; 4]);
+    }
+
+    #[test]
+    fn snapshot_time_rejects_odd_names() {
+        assert!(snapshot_time("2026-03-14_10-00-01").is_some());
+        for bad in [
+            "",
+            "../x",
+            "2026-03-14_10-00-01; rm",
+            "2026-03-14 10-00-01",
+            "2026-3-14_10-00-01",
+            "x",
+        ] {
+            assert!(snapshot_time(bad).is_none(), "{bad}");
+        }
+        assert!(delete_snapshot("../etc").is_err());
+    }
+
+    #[test]
     fn apt_cache_counts_only_deb_files() {
         let d = tmp("apt");
         touch(&d.join("a_1_amd64.deb"), 400);
@@ -1265,15 +1320,55 @@ mod tests {
         touch(&home.join("c/node_modules/p/node_modules/q"), 5); // inside a hit: counted once
         touch(&home.join(".hidden/Cargo.toml"), 1);
         touch(&home.join(".hidden/target/z"), 9);
+        touch(&home.join("p/requirements.txt"), 1);
+        touch(&home.join("p/.venv/pyvenv.cfg"), 20); // a venv next to a project file
+        touch(&home.join("q/.venv/pyvenv.cfg"), 20); // nothing could recreate it
+        touch(&home.join("r/pyproject.toml"), 1);
+        touch(&home.join("r/venv/x"), 20); // no pyvenv.cfg: not a venv
         touch(&home.join("skip/Cargo.toml"), 1);
         touch(&home.join("skip/target/w"), 9);
-        let found = builds(&home, &[home.join("skip")], &AtomicBool::new(false));
+        let (found, _) = builds(&home, &[home.join("skip")], &AtomicBool::new(false));
         let ids: Vec<_> = found
             .iter()
             .map(|i| i.id.strip_prefix(home.to_str().unwrap()).unwrap())
             .collect();
-        assert_eq!(ids, ["/a/target", "/c/node_modules"]);
+        assert_eq!(ids, ["/a/target", "/c/node_modules", "/p/.venv"]);
         assert_eq!(found[0].size, 500);
+    }
+
+    #[test]
+    fn pycaches_group_per_project_and_only_pyc_only_folders_go() {
+        let home = tmp("pyc");
+        touch(&home.join("app/pyproject.toml"), 1);
+        touch(&home.join("app/__pycache__/a.cpython-312.pyc"), 100);
+        touch(&home.join("app/sub/__pycache__/b.pyc"), 50);
+        touch(&home.join("loose/__pycache__/c.pyc"), 7); // no marker: its parent is the project
+        touch(&home.join("mixed/__pycache__/d.pyc"), 9);
+        touch(&home.join("mixed/__pycache__/notes.txt"), 9); // not only .pyc: left alone
+        touch(&home.join(".hidden/__pycache__/e.pyc"), 9);
+        touch(&home.join("__pycache__/f.pyc"), 9); // right in $HOME: not a project
+        touch(
+            &home.join("venvs/x/lib/python3.12/site-packages/pip/__pycache__/g.pyc"),
+            9,
+        ); // a venv's packages
+        touch(&home.join("outer/__pycache__/h.pyc"), 5); // no marker: two nested folders are two projects
+        touch(&home.join("outer/inner/__pycache__/i.pyc"), 3);
+        let (_, found) = builds(&home, &[], &AtomicBool::new(false));
+        let ids: Vec<_> = found
+            .iter()
+            .map(|i| (i.id.strip_prefix(home.to_str().unwrap()).unwrap(), i.size))
+            .collect();
+        assert_eq!(ids, [("/app", 150), ("/loose", 7), ("/outer", 5), ("/outer/inner", 3)]);
+        // Clearing the outer one leaves the inner one for its own row instead of failing it later.
+        clear_pycaches(&home, &found[2].id).unwrap();
+        assert!(!home.join("outer/__pycache__").exists() && home.join("outer/inner/__pycache__").exists());
+        clear_pycaches(&home, &found[3].id).unwrap();
+        assert!(clear_pycaches(&home, home.to_str().unwrap()).is_err());
+        clear_pycaches(&home, &found[0].id).unwrap();
+        assert!(!home.join("app/__pycache__").exists() && !home.join("app/sub/__pycache__").exists());
+        assert!(home.join("app/pyproject.toml").exists());
+        assert!(clear_pycaches(&home, &found[0].id).is_err()); // nothing left
+        assert!(home.join("mixed/__pycache__/notes.txt").exists());
     }
 
     #[test]
@@ -1357,7 +1452,8 @@ mod tests {
     #[test]
     fn df_is_parsed() {
         let text = "Filesystem 1-blocks Used Available Capacity Mounted on\n\
-                    /dev/sda2 1000 400 600 40% /\n/dev/sdb1 2000 1900 100 95% /mnt/my data\nnone 0 0 0 - /x\n";
+                    /dev/sda2 1000 400 600 40% /\n/dev/sdb1 2000 1900 100 95% /mnt/my data\nnone 0 0 0 - /x\n\
+                    x 5 5 0 100% /tmp/.mount_spotifGAdfMc\nefivarfs 9 1 8 1% /sys/firmware/efi/efivars\n";
         let m = parse_df(text);
         assert_eq!(m.len(), 2);
         assert_eq!(
@@ -1380,111 +1476,6 @@ mod tests {
         assert!(big[0].id.ends_with(".steam/g/big.bin"));
         let (f, b) = home_usage(&home, &[], 500, &AtomicBool::new(true));
         assert!(f.is_empty() && b.is_empty(), "cancelled before the first entry");
-    }
-
-    #[test]
-    fn vdf_values_are_read_by_key() {
-        let text = "\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t\"/a b\"\n\t\t\"label\"\t\t\"\"\n\t}\n\t\"1\" { \"path\" \"/c\" }\n}";
-        assert_eq!(parse_vdf_values(text, "path"), ["/a b"]);
-        assert_eq!(parse_vdf_values(text, "label"), [""]);
-        assert!(parse_vdf_values(text, "missing").is_empty());
-    }
-
-    #[test]
-    fn steam_games_come_from_every_mounted_library() {
-        let (root, other) = (tmp("steam-root"), tmp("steam-other"));
-        let acf = |id: &str, name: &str, size: u64| {
-            format!(
-                "\"AppState\"\n{{\n\t\"appid\"\t\t\"{id}\"\n\t\"name\"\t\t\"{name}\"\n\t\"installdir\"\t\t\"{name} dir\"\n\t\"SizeOnDisk\"\t\t\"{size}\"\n}}"
-            )
-        };
-        let vdf = format!(
-            "\"libraryfolders\"\n{{\n\t\"1\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t}}\n\t\"2\"\n\t{{\n\t\t\"path\"\t\t\"/not/mounted\"\n\t}}\n}}",
-            other.display()
-        );
-        touch(&root.join("steamapps/libraryfolders.vdf"), 0);
-        fs::write(root.join("steamapps/libraryfolders.vdf"), vdf).unwrap();
-        fs::write(root.join("steamapps/appmanifest_1.acf"), acf("1", "Small", 10)).unwrap();
-        touch(&other.join("steamapps/appmanifest_2.acf"), 0);
-        fs::write(other.join("steamapps/appmanifest_2.acf"), acf("2", "Big", 99)).unwrap();
-        let libs = steam_libraries(&[root.canonicalize().unwrap()]);
-        assert_eq!(libs.len(), 2);
-        let mut found = steam_games(&libs);
-        found.sort_by_key(|i| std::cmp::Reverse(i.size));
-        assert_eq!(
-            found.iter().map(|i| (i.id.as_str(), i.size)).collect::<Vec<_>>(),
-            [("Big", 99), ("Small", 10)]
-        );
-        assert!(found[0].path.ends_with("steamapps/common/Big dir"));
-    }
-
-    #[test]
-    fn old_versions_keep_the_newest_and_skip_links() {
-        let dir = tmp("versions");
-        for (name, age) in [("1.0", 400), ("1.1", 300), ("1.2", 200), ("1.3", 100)] {
-            touch(&dir.join(name).join("f"), 7);
-            let t = std::time::SystemTime::now() - std::time::Duration::from_secs(age);
-            fs::File::open(dir.join(name)).unwrap().set_modified(t).unwrap();
-        }
-        std::os::unix::fs::symlink(dir.join("1.0"), dir.join("latest")).unwrap();
-        let all = old_versions(&dir, "", "tool", &|_| vec![], false);
-        let ids = |keep: Keep| {
-            all.iter()
-                .filter(|v| v.keep == keep)
-                .map(|v| v.item.id.as_str())
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(ids(Keep::No), ["tool/1.1", "tool/1.0"]);
-        assert_eq!(ids(Keep::Newest), ["tool/1.3", "tool/1.2"]);
-        assert_eq!(all[2].item.size, 7);
-        assert!(
-            old_versions(&dir, "Proton", "tool", &|_| vec![], false).is_empty(),
-            "prefix filter"
-        );
-        // In use beats newest and old, the default tool beats both; a Steam-managed old one is not offered.
-        let users = |n: &str| match n {
-            "1.0" => vec!["Game A".to_string(), "Game B".into()],
-            "1.3" => vec![String::new(), "Game C".into()],
-            _ => vec![],
-        };
-        let used = old_versions(&dir, "", "tool", &users, true);
-        let keeps: Vec<Keep> = used.iter().map(|v| v.keep).collect();
-        assert_eq!(keeps, [Keep::Default, Keep::Newest, Keep::Steam, Keep::InUse]);
-        assert_eq!(used[0].games, ["Game C"]);
-        assert_eq!(used[3].games, ["Game A", "Game B"]);
-    }
-
-    #[test]
-    fn steam_tool_names_come_from_the_compat_mapping_only() {
-        let vdf = "\"Steam\"\n{\n\t\"name\"\t\"not me\"\n\t\"CompatToolMapping\"\n\t{\n\t\t\"0\"\n\t\t{\n\t\t\t\"name\"\t\t\"Proton-Experimental\"\n\t\t}\n\t\t\"1\"\n\t\t{\n\t\t\t\"name\"\t\t\"GE-Proton9-7\"\n\t\t\t\"config\"\t\t\"\"\n\t\t}\n\t}\n\t\"name\"\t\"after\"\n}\n";
-        assert_eq!(
-            parse_tool_map(vdf),
-            [
-                ("0".to_string(), "proton-experimental".to_string()),
-                ("1".to_string(), "ge-proton9-7".to_string())
-            ]
-        );
-        assert!(parse_tool_map("no mapping").is_empty());
-    }
-
-    #[test]
-    fn installed_ids_come_from_every_library_apps_block() {
-        let vdf = "\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t\"/a\"\n\t\t\"apps\"\n\t\t{\n\t\t\t\"228980\"\t\t\"1\"\n\t\t\t\"367520\"\t\t\"2\"\n\t\t}\n\t}\n\t\"1\"\n\t{\n\t\t\"path\"\t\t\"/b\"\n\t\t\"apps\"\n\t\t{\n\t\t\t\"588650\"\t\t\"3\"\n\t\t}\n\t}\n}\n";
-        assert_eq!(parse_installed_ids(vdf), ["228980", "367520", "588650"]);
-        assert!(parse_installed_ids("").is_empty());
-    }
-
-    #[test]
-    fn official_proton_folders_map_to_steam_names() {
-        for (dir, name) in [
-            ("Proton 9.0 (Beta)", "proton_9"),
-            ("Proton 10.0", "proton_10"),
-            ("Proton 6.3", "proton_63"),
-            ("Proton - Experimental", "proton_experimental"),
-            ("Proton Hotfix", "proton_hotfix"),
-        ] {
-            assert_eq!(proton_name(dir), name, "{dir}");
-        }
     }
 
     #[test]
@@ -1585,12 +1576,54 @@ mod tests {
 
     #[test]
     fn root_command_shows_exactly_the_script_that_runs() {
-        let script = root_script(&[3, 16, 10, 9]);
-        assert_eq!(root_command(&[3, 16, 10, 9]), format!("pkexec /bin/sh -c '{script}'"));
+        let script = root_script(&[3, 16, 10, 9, 22]);
+        assert_eq!(
+            root_command(&[3, 16, 10, 9, 22]),
+            format!("pkexec /bin/sh -c '{script}'")
+        );
         // Unknown actions are left out; each known step has its marker.
-        assert_eq!(script.matches("@@").count(), 3);
+        assert_eq!(script.matches("@@").count(), 4);
+        assert!(script.contains("-name core.\\* -delete"));
         assert!(script.starts_with("/usr/bin/apt-get autoremove -y 2>&1; printf"));
         assert!(!script.contains('\''));
+    }
+
+    #[test]
+    fn coredumps_are_counted_by_program() {
+        let id = "1ef56881ef8e4c31acc41394755bd6eb.125754.1794630395000000";
+        assert_eq!(dump_program(&format!("core.nemo.1000.{id}.zst")), Some("nemo"));
+        assert_eq!(dump_program(&format!("core.opencam.1000.{id}")), Some("opencam"));
+        assert_eq!(dump_program(&format!("core.my.app.1000.{id}.xz")), Some("my.app"));
+        assert_eq!(dump_program("core.nemo"), None);
+        assert_eq!(dump_program("notes.txt"), None);
+        let dir = tmp("dumps");
+        touch(&dir.join(format!("core.opencam.1000.{id}.zst")), 100);
+        touch(
+            &dir.join("core.opencam.1000.1ef56881ef8e4c31acc41394755bd6eb.9.1794630395000001.zst"),
+            50,
+        );
+        touch(&dir.join(format!("core.nemo.1000.{id}.zst")), 10);
+        touch(&dir.join("readme.txt"), 999);
+        let c = coredumps(&dir);
+        assert_eq!((c.size, c.count, c.top.as_str()), (160, 3, "opencam"));
+        assert_eq!(coredumps(&dir.join("missing")), Coredumps::default());
+    }
+
+    #[test]
+    fn rotated_logs_are_only_the_old_copies() {
+        for n in ["syslog.1", "auth.log.10", "dpkg.log.2.gz", "Xorg.0.log.old.xz", "a.gz"] {
+            assert!(is_rotated(n), "{n}");
+        }
+        for n in ["syslog", "kern.log", "boot.log", "x.123", "wtmp", ".1", "Xorg.0.log"] {
+            assert!(!is_rotated(n), "{n}");
+        }
+        let dir = tmp("rotated");
+        touch(&dir.join("syslog"), 1000);
+        touch(&dir.join("syslog.1"), 100);
+        touch(&dir.join("syslog.2.gz"), 20);
+        touch(&dir.join("apt/history.log.1.gz"), 3);
+        assert_eq!(rotated_logs(&dir), (123, 3));
+        assert_eq!(rotated_logs(&dir.join("missing")), (0, 0));
     }
 
     #[test]

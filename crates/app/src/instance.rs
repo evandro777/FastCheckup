@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-const MAX_COMMAND: u64 = 64;
+const MAX_COMMAND: u64 = 4200;
 
 /// `<crate name>.sock` in the runtime directory. None without `XDG_RUNTIME_DIR`: a shared directory such as `/tmp`
 /// would let other users block the socket or send commands to it.
@@ -89,7 +89,7 @@ fn listen_at(path: &Path, on_command: impl Fn(String) + Send + 'static) -> std::
 }
 
 /// Brings a plain window back in front of the others: un-minimize, show, and ask the window manager for focus.
-/// The popups (FastPaste, FastMoji) have their own focus handling and never call it.
+/// The popups (FastClipboard, FastMoji) have their own focus handling and never call it.
 #[allow(dead_code)]
 pub fn raise(window: &slint::Window) {
     use slint::winit_030::WinitWindowAccessor;

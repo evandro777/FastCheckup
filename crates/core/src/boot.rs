@@ -7,8 +7,9 @@ use std::{
 };
 
 use crate::{
+    apps::run,
     autostart::{matches, rules},
-    services::{parse_secs, pkexec_sh, run},
+    services::{parse_secs, pkexec_sh},
 };
 
 const GRUB_FILE: &str = "/etc/default/grub";
@@ -16,6 +17,11 @@ const CP: &str = "/usr/bin/cp";
 const SED: &str = "/usr/bin/sed";
 const CMP: &str = "/usr/bin/cmp";
 const UPDATE_GRUB: &str = "/usr/sbin/update-grub";
+const LS: &str = "/usr/bin/ls";
+const HEAD: &str = "/usr/bin/head";
+const XARGS: &str = "/usr/bin/xargs";
+const RM: &str = "/usr/bin/rm";
+const KEEP_BACKUPS: u32 = 3;
 const MAX_TIMEOUT: u32 = 60;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -291,7 +297,8 @@ fn set_script(old: &str, secs: u32, backup: &str) -> String {
         "{CP} -a {GRUB_FILE} {backup} || exit 1
 if {SED} -i -E '{sed}' {GRUB_FILE}; then
   if {CMP} -s - {GRUB_FILE}; then
-    {UPDATE_GRUB} && exit 0
+    # Names hold the epoch seconds, so the listing is oldest first: keep the newest {KEEP_BACKUPS}.
+    {UPDATE_GRUB} && {{ {LS} -1 {GRUB_FILE}.fastcheckup-*.bak | {HEAD} -n -{KEEP_BACKUPS} | {XARGS} -r {RM} -f --; exit 0; }}
     r=$?
   else
     echo \"the file does not match the preview\" >&2

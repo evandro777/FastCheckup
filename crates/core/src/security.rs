@@ -9,17 +9,21 @@ use std::{
 
 use serde_json::Value;
 
-use crate::{
-    admin::Admin,
-    apps::run as run_c,
-    services::{pkexec_output, run},
-};
+use crate::{admin::Admin, apps::run, services::pkexec_output};
 
 /// `code` picks the sentence in the UI: 0 port open to the network (`n` = pid of the owner), 1 outbound connections of a program,
 /// 2 program from an unusual path, 3 `ld.so.preload`, 4 cron job, 5 user systemd unit, 6 `authorized_keys`,
 /// 7 recently changed shell rc file, 8 browser extension with broad access, 9 failed logins, 10 firewall,
 /// 11 restart needed (`subject` = packages, may be empty), 12 running kernel no longer installed (`subject` = version),
-/// 13 updates waiting (`n` = count, `extra` = how many are security updates, empty for none), 14 held packages (`subject`).
+/// 13 updates waiting (`n` = count, `extra` = how many are security updates, empty for none), 14 held packages (`subject`),
+/// 15 connected Wi-Fi with weak security (`subject` = name, `n` 0 open, 1 WEP, 2 WPA1), 16 saved open Wi-Fi that joins by
+/// itself (`subject` = names), 17 system proxy (`subject` = setting, `n` 0 /etc/environment, 1 desktop),
+/// 18 root certificates added by hand (`subject` = file names). Codes 19 to 22 (`level` -1) say the checks 15 to 18
+/// ran and found nothing (19: `n` 3 secure Wi-Fi `subject`, 4 not on Wi-Fi). 23 SSH server allows passwords or root
+/// login (`subject` = the settings), 25 `/etc/hosts` sends names to public addresses (`subject`); 24 and 26 are their
+/// fine lines (24: `n` 0 server not running, 1 running and locked down). 27 one hardware address answers for several
+/// addresses (`subject` = `mac = ip ip`), 29 Samba/NFS shares open to everyone (`subject`); 28 and 30 are their fine
+/// lines (30: `n` 0 neither server runs, 1 running with nothing open).
 /// `level`: 0 information, 1 worth a look, 2 suspicious.
 #[derive(Debug, PartialEq)]
 pub struct Finding {
@@ -86,6 +90,7 @@ pub fn scan(admin: Option<&Admin>) -> Scan {
     findings.extend(unusual_processes(&roots.home, admin));
     findings.extend(persistence(&roots, &run("crontab", &["-l"])));
     findings.extend(extensions(&roots.home));
+    findings.extend(network_findings());
     let failed = parse_failed_logins(&admin.map_or_else(
         || {
             run(
@@ -121,8 +126,8 @@ pub fn scan(admin: Option<&Admin>) -> Scan {
         Path::new("/lib/modules").join(kernel).exists(),
     ));
     findings.extend(update_findings(
-        &run_c("apt", &["list", "--upgradable"]),
-        &run_c("apt-mark", &["showhold"]),
+        &run("apt", &["list", "--upgradable"]),
+        &run("apt-mark", &["showhold"]),
     ));
     // The firewall goes first among its level: it is one line, and 20 open ports would bury it.
     findings.sort_by_key(|f| (-f.level, f.code != 10, f.code));
@@ -257,21 +262,29 @@ pub fn parse_connections(text: &str) -> Vec<Finding> {
 }
 
 /// Programs known to run from hidden or temporary folders; without this the list is mostly noise.
-const KNOWN_GOOD: [&str; 9] = [
-    "/tmp/.mount_", // AppImage
+/// Matched from the start of the path (an AppImage mount, or a folder directly under home), never anywhere inside it:
+/// anyone can create `/tmp/x/.cargo/`.
+const KNOWN_GOOD_ROOT: [&str; 1] = ["/tmp/.mount_"]; // AppImage
+const KNOWN_GOOD_HOME: [&str; 8] = [
     ".cache/gitstatus",
     ".vscode",
     ".dropbox-dist",
     ".claude",
     ".local/share/claude",
-    "gitkraken",
+    ".gitkraken",
     ".cargo",
     ".rustup",
 ];
 
 /// 2 for a program running from a temp folder, 1 for a deleted file or a hidden folder under home, else 0.
 pub fn exe_level(exe: &str, home: &str) -> i32 {
-    if KNOWN_GOOD.iter().any(|k| exe.contains(k)) {
+    let under_home = |k: &&str| {
+        !home.is_empty()
+            && exe
+                .strip_prefix(home)
+                .is_some_and(|r| r.strip_prefix('/').is_some_and(|r| r.starts_with(*k)))
+    };
+    if KNOWN_GOOD_ROOT.iter().any(|k| exe.starts_with(k)) || KNOWN_GOOD_HOME.iter().any(under_home) {
         return 0;
     }
     if ["/tmp/", "/dev/shm/", "/var/tmp/"].iter().any(|p| exe.starts_with(p)) {
@@ -449,14 +462,18 @@ pub fn parse_manifest(manifest: &str, messages: Option<&str>) -> Option<(String,
     let m: Value = serde_json::from_str(manifest).ok()?;
     let mut name = m.get("name")?.as_str()?.to_string();
     if let Some(key) = name.strip_prefix("__MSG_").and_then(|k| k.strip_suffix("__")) {
-        let msgs: Value = serde_json::from_str(messages?).ok()?;
-        // Chrome message keys are case-insensitive.
-        name = msgs
-            .as_object()?
-            .iter()
-            .find(|(k, _)| k.eq_ignore_ascii_case(key))
-            .and_then(|(_, v)| v.get("message")?.as_str())?
-            .to_string();
+        // Chrome message keys are case-insensitive. A name that cannot be looked up stays as the raw placeholder: the
+        // add-on's powers must be listed anyway, or one could hide itself by pointing at a message that is not there.
+        let looked_up = messages
+            .and_then(|t| serde_json::from_str::<Value>(t).ok())
+            .and_then(|msgs| {
+                msgs.as_object()?
+                    .iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case(key))
+                    .and_then(|(_, v)| v.get("message")?.as_str())
+                    .map(String::from)
+            });
+        name = looked_up.unwrap_or(name);
     }
     let perms = strings(&m, "permissions").chain(strings(&m, "host_permissions"));
     Some((name, broad(perms)))
@@ -522,6 +539,8 @@ fn extensions(home: &Path) -> Vec<Finding> {
                 let locale = serde_json::from_str::<Value>(&text)
                     .ok()
                     .and_then(|m| m.get("default_locale")?.as_str().map(String::from))
+                    // The add-on writes this file, so it must not name a folder outside its own `_locales`.
+                    .filter(|l| crate::apps::plain(l))
                     .unwrap_or_else(|| "en".into());
                 let msgs = fs::read_to_string(ver.join("_locales").join(locale).join("messages.json")).ok();
                 found.extend(parse_manifest(&text, msgs.as_deref()).map(|e| (bi, e)));
@@ -557,6 +576,294 @@ pub fn parse_failed_logins(text: &str) -> usize {
     text.lines()
         .filter(|l| l.contains("Failed password") || l.contains("authentication failure"))
         .count()
+}
+
+/// Splits one line of `nmcli -t`, where `:` inside a value is written `\:`.
+fn split_terse(line: &str) -> Vec<String> {
+    let (mut out, mut cur, mut esc) = (Vec::new(), String::new(), false);
+    for c in line.chars() {
+        match (esc, c) {
+            (false, '\\') => esc = true,
+            (false, ':') => out.push(std::mem::take(&mut cur)),
+            _ => {
+                cur.push(c);
+                esc = false;
+            }
+        }
+    }
+    out.push(cur);
+    out
+}
+
+/// The connected Wi-Fi from `nmcli -t -f ACTIVE,SSID,SECURITY dev wifi` when it is open (`n` 0), WEP (1) or WPA1 only (2).
+fn wifi_findings(text: &str) -> Vec<Finding> {
+    text.lines()
+        .map(split_terse)
+        .filter(|f| f.len() == 3 && f[0] == "yes")
+        .filter_map(|f| {
+            let sec = f[2].trim();
+            let (n, level) = if sec.is_empty() || sec == "--" {
+                (0, 2)
+            } else if sec.contains("WEP") {
+                (1, 2)
+            } else if sec.contains("WPA1") && !sec.contains("WPA2") && !sec.contains("WPA3") {
+                (2, 1)
+            } else {
+                return None;
+            };
+            Some(finding(15, level, f[1].clone(), "", n))
+        })
+        .collect()
+}
+
+/// Saved Wi-Fi profiles that join by themselves without a password: any open hotspot with the same name connects
+/// (evil twin). `key_mgmt` reads `802-11-wireless-security.key-mgmt` of a profile; empty means no security.
+fn open_autoconnect(list: &str, key_mgmt: impl Fn(&str) -> String) -> Option<Finding> {
+    let names: Vec<String> = list
+        .lines()
+        .map(split_terse)
+        .filter(|f| f.len() == 3 && f[1] == "802-11-wireless" && f[2] == "yes")
+        .map(|f| f[0].clone())
+        .filter(|n| key_mgmt(n).trim().is_empty())
+        .collect();
+    (!names.is_empty()).then(|| finding(16, 1, names.join(", "), "", names.len()))
+}
+
+/// Proxies set for the whole system: `*_proxy=` lines of `/etc/environment` (`n` 0) and the GNOME proxy mode (1).
+/// A hijacked proxy sees all web traffic, so it is worth a look even when it is yours.
+fn proxy_findings(environment: &str, gnome_mode: &str) -> Vec<Finding> {
+    let mut out: Vec<Finding> = environment
+        .lines()
+        .map(|l| l.trim().trim_start_matches("export ").trim())
+        .filter(|l| {
+            let key = l.split('=').next().unwrap_or("").to_ascii_lowercase();
+            l.contains('=') && ["http_proxy", "https_proxy", "ftp_proxy", "all_proxy"].contains(&key.as_str())
+        })
+        .map(|l| finding(17, 1, l, "", 0))
+        .collect();
+    let mode = gnome_mode.trim().trim_matches('\'');
+    if !mode.is_empty() && mode != "none" {
+        out.push(finding(17, 1, mode, "", 1));
+    }
+    out
+}
+
+/// Certificates added by hand to the system store: whoever holds the key behind one can read HTTPS traffic.
+fn extra_certs(dir: &Path) -> Option<Finding> {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n.ends_with(".crt"))
+        .collect();
+    names.sort_unstable();
+    (!names.is_empty()).then(|| finding(18, 1, names.join(", "), "", names.len()))
+}
+
+/// What `wifi_findings` found fine, so the page can say the check ran: the secure network in use (`n` 3) or no Wi-Fi
+/// in use (4). `None` when `nmcli` printed nothing (not installed or no Wi-Fi card): nothing was checked.
+fn wifi_ok(text: &str) -> Option<Finding> {
+    let active = text.lines().map(split_terse).find(|f| f.len() == 3 && f[0] == "yes");
+    match active {
+        Some(f) => Some(finding(19, -1, f[1].clone(), "", 3)),
+        None => (!text.trim().is_empty()).then(|| finding(19, -1, "", "", 4)),
+    }
+}
+
+/// Level -1 findings mean "checked and fine": the page lists them last with a tick, the counts leave them out.
+fn network_findings() -> Vec<Finding> {
+    let wifi = run("nmcli", &["-t", "-f", "ACTIVE,SSID,SECURITY", "dev", "wifi"]);
+    let mut out = wifi_findings(&wifi);
+    if out.is_empty() {
+        out.extend(wifi_ok(&wifi));
+    }
+    let profiles = run("nmcli", &["-t", "-f", "NAME,TYPE,AUTOCONNECT", "con", "show"]);
+    match open_autoconnect(&profiles, |n| {
+        run("nmcli", &["-g", "802-11-wireless-security.key-mgmt", "con", "show", n])
+    }) {
+        Some(f) => out.push(f),
+        None if !profiles.trim().is_empty() => out.push(finding(20, -1, "", "", 0)),
+        None => {}
+    }
+    let proxies = proxy_findings(
+        &fs::read_to_string("/etc/environment").unwrap_or_default(),
+        &run("gsettings", &["get", "org.gnome.system.proxy", "mode"]),
+    );
+    out.extend(if proxies.is_empty() {
+        vec![finding(21, -1, "", "", 2)]
+    } else {
+        proxies
+    });
+    out.push(extra_certs(Path::new("/usr/local/share/ca-certificates")).unwrap_or_else(|| finding(22, -1, "", "", 0)));
+    out.push(hosts_finding(&fs::read_to_string("/etc/hosts").unwrap_or_default()));
+    out.push(sshd_finding(
+        run("systemctl", &["is-active", "ssh", "sshd"])
+            .lines()
+            .any(|l| l.trim() == "active"),
+        &sshd_configs(Path::new("/etc/ssh")),
+    ));
+    out.push(arp_finding(&crate::lan::parse_neigh(&run("ip", &["-4", "neigh"]))));
+    let active = |unit: &str| run("systemctl", &["is-active", unit]).trim() == "active";
+    out.push(shares_finding(
+        active("smbd").then(|| fs::read_to_string("/etc/samba/smb.conf").unwrap_or_default()),
+        active("nfs-server").then(|| fs::read_to_string("/etc/exports").unwrap_or_default()),
+    ));
+    out
+}
+
+/// One hardware address answering for several addresses on the LAN: a router can do it (proxy ARP), and so can
+/// someone posing as it (ARP spoofing). Only a hint, so level 1. 28 is the fine line.
+fn arp_finding(neigh: &[(std::net::Ipv4Addr, String)]) -> Finding {
+    let mut by_mac: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for (ip, mac) in neigh {
+        by_mac.entry(mac.to_ascii_lowercase()).or_default().push(ip.to_string());
+    }
+    let dup: Vec<String> = by_mac
+        .into_iter()
+        .filter(|(_, ips)| ips.len() > 1)
+        .map(|(mac, ips)| format!("{mac} = {}", ips.join(" ")))
+        .collect();
+    if dup.is_empty() {
+        finding(28, -1, "", "", 0)
+    } else {
+        finding(27, 1, dup.join("; "), "", dup.len())
+    }
+}
+
+/// Samba share names open to guests (`guest ok`/`public` = yes): no password needed.
+fn samba_open_shares(conf: &str) -> Vec<String> {
+    let (mut section, mut out) = (String::new(), Vec::<String>::new());
+    for line in conf.lines() {
+        let l = line.split(['#', ';']).next().unwrap_or("").trim();
+        if let Some(name) = l.strip_prefix('[').and_then(|r| r.strip_suffix(']')) {
+            section = name.trim().to_string();
+        } else if let Some((k, v)) = l.split_once('=') {
+            let key = k.split_whitespace().collect::<Vec<_>>().join(" ").to_ascii_lowercase();
+            let on = matches!(v.trim().to_ascii_lowercase().as_str(), "yes" | "true" | "1");
+            let special = ["global", "printers", "print$"].contains(&section.to_ascii_lowercase().as_str());
+            if on && ["guest ok", "public"].contains(&key.as_str()) && !special && !out.contains(&section) {
+                out.push(section.clone());
+            }
+        }
+    }
+    out
+}
+
+/// NFS exports offered to every host (`*` or no client list).
+fn nfs_open_exports(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|l| {
+            let mut w = l.split('#').next().unwrap_or("").split_whitespace();
+            let path = w.next()?;
+            let mut clients = w.peekable();
+            (clients.peek().is_none() || clients.any(|c| c.starts_with('*') || c.starts_with('(')))
+                .then(|| path.to_string())
+        })
+        .collect()
+}
+
+/// `smb`/`nfs`: the config text when that server runs, `None` when it does not. 30 is the fine line (`n` 0 neither
+/// runs, 1 nothing open to everyone).
+fn shares_finding(smb: Option<String>, nfs: Option<String>) -> Finding {
+    let mut parts = Vec::new();
+    if let Some(c) = &smb {
+        let s = samba_open_shares(c);
+        if !s.is_empty() {
+            parts.push(format!("Samba: {}", s.join(", ")));
+        }
+    }
+    if let Some(c) = &nfs {
+        let s = nfs_open_exports(c);
+        if !s.is_empty() {
+            parts.push(format!("NFS: {}", s.join(", ")));
+        }
+    }
+    if !parts.is_empty() {
+        finding(29, 1, parts.join("; "), "", 0)
+    } else {
+        finding(30, -1, "", "", usize::from(smb.is_some() || nfs.is_some()))
+    }
+}
+
+/// The SSH server settings in the order sshd reads them. shortcut: assumes the stock `Include sshd_config.d/*.conf`
+/// at the top of `sshd_config` (Debian/Ubuntu), so drop-ins come first; upgrade by following `Include` if that breaks.
+fn sshd_configs(dir: &Path) -> Vec<String> {
+    let mut drop_ins: Vec<PathBuf> = fs::read_dir(dir.join("sshd_config.d"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "conf"))
+        .collect();
+    drop_ins.sort();
+    drop_ins.push(dir.join("sshd_config"));
+    drop_ins.iter().filter_map(|p| fs::read_to_string(p).ok()).collect()
+}
+
+/// Password or root login over SSH, only when the server runs (`n` 0 of the fine line: not running). sshd keeps the
+/// first value of a keyword, and passwords are allowed unless turned off. shortcut: `Match` blocks are not read.
+fn sshd_finding(running: bool, configs: &[String]) -> Finding {
+    if !running {
+        return finding(24, -1, "", "", 0);
+    }
+    let first = |key: &str| {
+        configs.iter().find_map(|c| {
+            c.lines()
+                .map(str::trim)
+                .take_while(|l| !l.to_ascii_lowercase().starts_with("match "))
+                .find_map(|l| {
+                    let mut w = l.split_whitespace();
+                    w.next()
+                        .filter(|k| k.eq_ignore_ascii_case(key))
+                        .and_then(|_| w.next())
+                        .map(str::to_ascii_lowercase)
+                })
+        })
+    };
+    let mut bad = Vec::new();
+    if first("PasswordAuthentication").is_none_or(|v| v != "no") {
+        bad.push("PasswordAuthentication yes");
+    }
+    if first("PermitRootLogin").is_some_and(|v| v == "yes") {
+        bad.push("PermitRootLogin yes");
+    }
+    if bad.is_empty() {
+        finding(24, -1, "", "", 1)
+    } else {
+        finding(23, 1, bad.join(", "), "", 0)
+    }
+}
+
+/// `/etc/hosts` lines that send a name to a public address: a way to redirect a site (a LAN or loopback address is
+/// normal, and ad-block lists use 0.0.0.0).
+fn hosts_finding(text: &str) -> Finding {
+    let public = |ip: std::net::IpAddr| match ip {
+        std::net::IpAddr::V4(a) => !(a.is_loopback() || a.is_unspecified() || a.is_private() || a.is_link_local()),
+        std::net::IpAddr::V6(a) => {
+            !(a.is_loopback()
+                || a.is_unspecified()
+                || a.is_multicast()
+                || a.segments()[0] & 0xfe00 == 0xfc00
+                // fe00::/8 holds link-local (fe80::/10) and Debian's stock `fe00::0 ip6-localnet`
+                || a.segments()[0] & 0xff00 == 0xfe00)
+        }
+    };
+    let found: Vec<String> = text
+        .lines()
+        .map(|l| l.split('#').next().unwrap_or("").trim())
+        .filter_map(|l| {
+            let mut w = l.split_whitespace();
+            let ip = w.next()?;
+            let names: Vec<&str> = w.collect();
+            (!names.is_empty() && ip.parse().is_ok_and(public)).then(|| format!("{ip} {}", names.join(" ")))
+        })
+        .collect();
+    if found.is_empty() {
+        finding(26, -1, "", "", 0)
+    } else {
+        finding(25, 1, found.join(", "), "", found.len())
+    }
 }
 
 /// `pkgs` is the text of `reboot-required.pkgs` when `/var/run/reboot-required` exists, `None` otherwise.
@@ -686,6 +993,12 @@ mod tests {
         assert_eq!(exe_level("/home/u/.vscode/server/node", "/home/u"), 0);
         assert_eq!(exe_level("/home/u/bin/tool", "/home/u"), 0);
         assert_eq!(exe_level("/home/u/.x", ""), 0);
+        // A known-good word inside the path of a program that started elsewhere does not clear it.
+        assert_eq!(exe_level("/tmp/b/.cargo/helper", "/home/u"), 2);
+        assert_eq!(exe_level("/var/tmp/.mount_x/a", "/home/u"), 2);
+        assert_eq!(exe_level("/home/u/.cache/.hidden/.vscode/x", "/home/u"), 1);
+        assert_eq!(exe_level("/home/u/.cargo/bin/rg", "/home/u"), 0);
+        assert_eq!(exe_level("/home/u/.vscode-server/bin/node", "/home/u"), 0);
     }
 
     #[test]
@@ -701,7 +1014,17 @@ mod tests {
         let (name, p) = parse_manifest(m, Some(msgs)).unwrap();
         assert_eq!(name, "Grammar Thing");
         assert_eq!(p, vec!["<all_urls>", "cookies"]);
-        assert!(parse_manifest(m, None).is_none());
+        // A name that cannot be looked up keeps its placeholder; the add-on and its powers are still listed.
+        let hidden = (
+            "__MSG_appName__".to_string(),
+            vec!["<all_urls>".to_string(), "cookies".to_string()],
+        );
+        assert_eq!(parse_manifest(m, None), Some(hidden.clone()));
+        assert_eq!(
+            parse_manifest(m, Some(r#"{"other":{"message":"x"}}"#)),
+            Some(hidden.clone())
+        );
+        assert_eq!(parse_manifest(m, Some("not json")), Some(hidden));
     }
 
     #[test]
@@ -740,6 +1063,123 @@ mod tests {
             f.iter()
                 .all(|f| !f.subject.contains("secret") && !f.extra.contains("secret"))
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn weak_wifi_only() {
+        let f = wifi_findings("no:Open Cafe:\nyes:Home\\:5G:WPA2\nyes:Cafe:--\n");
+        assert_eq!(
+            (f.len(), f[0].code, f[0].level, f[0].n, f[0].subject.as_str()),
+            (1, 15, 2, 0, "Cafe")
+        );
+        assert_eq!(wifi_findings("yes:Old:WPA1\n")[0].level, 1);
+        assert_eq!(wifi_findings("yes:Old:WEP\n")[0].n, 1);
+        assert!(wifi_findings("yes:Mixed:WPA1 WPA2\nyes:New:WPA3\n").is_empty());
+    }
+
+    #[test]
+    fn sshd_first_value_wins_and_off_means_fine() {
+        let c = |t: &str| vec![t.to_string()];
+        assert_eq!(sshd_finding(false, &c("PermitRootLogin yes")).code, 24);
+        assert_eq!(
+            sshd_finding(true, &c("PasswordAuthentication no\nPermitRootLogin prohibit-password")).code,
+            24
+        );
+        let f = sshd_finding(true, &c("# x\nPermitRootLogin yes\n"));
+        assert_eq!(
+            (f.code, f.subject.as_str()),
+            (23, "PasswordAuthentication yes, PermitRootLogin yes")
+        );
+        // A drop-in read first beats the main file; `Match` blocks are ignored.
+        let both = vec![
+            "PasswordAuthentication no\n".to_string(),
+            "PasswordAuthentication yes\n".to_string(),
+        ];
+        assert_eq!(sshd_finding(true, &both).code, 24);
+        assert_eq!(
+            sshd_finding(true, &c("PasswordAuthentication no\nMatch User x\nPermitRootLogin yes")).code,
+            24
+        );
+    }
+
+    #[test]
+    fn hosts_flags_public_addresses_only() {
+        let ok = "127.0.0.1 localhost\n::1 ip6-localhost\n0.0.0.0 ads.example\n192.168.1.5 nas # lan\nfe80::1 x\nfe00::0 ip6-localnet\n";
+        assert_eq!(hosts_finding(ok).code, 26);
+        let f = hosts_finding("8.8.8.8 bank.example www.bank.example\n# 9.9.9.9 off\n");
+        assert_eq!(
+            (f.code, f.n, f.subject.as_str()),
+            (25, 1, "8.8.8.8 bank.example www.bank.example")
+        );
+    }
+
+    #[test]
+    fn arp_flags_a_shared_mac_only() {
+        let n = |l: &[(&str, &str)]| {
+            l.iter()
+                .map(|(i, m)| (i.parse().unwrap(), m.to_string()))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            arp_finding(&n(&[("10.0.0.1", "aa:01"), ("10.0.0.2", "aa:02")])).code,
+            28
+        );
+        let f = arp_finding(&n(&[("10.0.0.1", "AA:01"), ("10.0.0.9", "aa:01")]));
+        assert_eq!((f.code, f.subject.as_str()), (27, "aa:01 = 10.0.0.1 10.0.0.9"));
+    }
+
+    #[test]
+    fn shares_open_to_everyone() {
+        let smb =
+            "[global]\n guest ok = yes\n[media]\n Guest  OK = Yes\n[docs]\n guest ok = no\n[pub]\n public = true ; x\n";
+        assert_eq!(samba_open_shares(smb), ["media", "pub"]);
+        assert_eq!(
+            nfs_open_exports("# c\n/srv *(rw)\n/home 192.168.1.0/24(rw)\n/open\n/x (ro)\n"),
+            ["/srv", "/open", "/x"]
+        );
+        assert_eq!(shares_finding(None, None).n, 0);
+        assert_eq!(shares_finding(Some("[a]\n".into()), None).n, 1);
+        let f = shares_finding(Some(smb.into()), Some("/srv *(rw)".into()));
+        assert_eq!((f.code, f.subject.as_str()), (29, "Samba: media, pub; NFS: /srv"));
+    }
+
+    #[test]
+    fn wifi_ok_says_what_was_checked() {
+        let f = wifi_ok("yes:Home:WPA2\n").unwrap();
+        assert_eq!((f.level, f.n, f.subject.as_str()), (-1, 3, "Home"));
+        assert_eq!(wifi_ok("no:Other:WPA2\n").unwrap().n, 4);
+        assert!(wifi_ok("").is_none());
+    }
+
+    #[test]
+    fn open_autoconnect_skips_secured_and_manual() {
+        let list = "Home:802-11-wireless:yes\nCafe:802-11-wireless:yes\nHotel:802-11-wireless:no\nVPN:vpn:yes\n";
+        let f = open_autoconnect(list, |n| if n == "Home" { "wpa-psk".into() } else { String::new() }).unwrap();
+        assert_eq!((f.subject.as_str(), f.n), ("Cafe", 1));
+        assert!(open_autoconnect(list, |_| "wpa-psk".into()).is_none());
+    }
+
+    #[test]
+    fn proxies_from_env_and_desktop() {
+        let f = proxy_findings(
+            "PATH=x\n# http_proxy=a\nexport HTTP_PROXY=http://1.2.3.4:80\nno_proxy=localhost\n",
+            "'manual'\n",
+        );
+        let got: Vec<(&str, i32)> = f.iter().map(|f| (f.subject.as_str(), f.n)).collect();
+        assert_eq!(got, vec![("HTTP_PROXY=http://1.2.3.4:80", 0), ("manual", 1)]);
+        assert!(proxy_findings("", "'none'\n").is_empty());
+    }
+
+    #[test]
+    fn extra_certs_lists_crt_files() {
+        let dir = std::env::temp_dir().join(format!("fc-cert-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        assert!(extra_certs(&dir).is_none());
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("corp.crt"), "x").unwrap();
+        fs::write(dir.join("notes.txt"), "x").unwrap();
+        assert_eq!(extra_certs(&dir).unwrap().subject, "corp.crt");
         let _ = fs::remove_dir_all(&dir);
     }
 

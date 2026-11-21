@@ -31,6 +31,8 @@ pub struct Settings {
     pub theme: String,
     /// Off by default: everything else the app cleans goes to the Trash, so emptying it is the one step with no way back.
     pub allow_empty_trash: bool,
+    /// Seconds between samples of Overview's "Right now" while that page is open (settings.toml only, no Preferences row).
+    pub refresh_s: u32,
 }
 
 impl Default for Settings {
@@ -44,6 +46,7 @@ impl Default for Settings {
             excluded_paths: Vec::new(),
             theme: String::new(),
             allow_empty_trash: false,
+            refresh_s: 1,
         }
     }
 }
@@ -78,6 +81,7 @@ impl Settings {
         self.height = self.height.clamp(MIN_SIZE.1, MAX_SIZE);
         // 0 would make everything "old" and so open to the bulk clean-up.
         self.usage_days = self.usage_days.clamp(MIN_OLD_DAYS, MAX_OLD_DAYS);
+        self.refresh_s = self.refresh_s.clamp(1, 3600);
     }
 
     /// Atomic write so a crash can never leave a half-written file. Failures are reported on stderr;
@@ -134,6 +138,15 @@ mod tests {
         let mut s: Settings = toml::from_str("width = 4000000000\nheight = 1").unwrap();
         s.normalize();
         assert_eq!((s.width, s.height), (MAX_SIZE, MIN_SIZE.1));
+    }
+
+    #[test]
+    fn refresh_defaults_to_one_second_and_never_zero() {
+        let mut s: Settings = toml::from_str("").unwrap();
+        assert_eq!(s.refresh_s, 1);
+        s.refresh_s = 0;
+        s.normalize();
+        assert_eq!(s.refresh_s, 1);
     }
 
     #[test]

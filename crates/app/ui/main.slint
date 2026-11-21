@@ -34,9 +34,20 @@ export struct Svc {
     secs: float,
     essential: bool,
     background: bool,
+    package: string,
+    packaged: bool,
+    delay: float,
+    triggers: string,
+    memory-mb: float,
+    cpu-secs: float,
+    failed: bool,
+    restarts: int,
+    doc-url: string,
+    man: string,
+    sysv: bool,
 }
 
-// One installed app. `source`: 0 Debian package, 1 Flatpak, 2 AppImage. `last` is a date, "" when unknown (no data
+// One installed app. `source`: 0 Debian package, 1 Flatpak, 2 AppImage, 3 other launcher (no package owns it; report only). `last` is a date, "" when unknown (no data
 // folder was found, which is not the same as unused). `group` indexes Tr.group, -1 when no other app does the same job.
 export struct AppRow {
     id: string,
@@ -58,6 +69,12 @@ export struct Kern {
     keep: bool,
     version: string,
     size-mb: float,
+}
+
+// A Timeshift snapshot (`2026-11-09_11-17-04`). `keep`: never offered for deletion (recent, or one of the newest).
+export struct Snap {
+    name: string,
+    keep: bool,
 }
 
 // Data left in ~/.var/app by a Flatpak that is no longer installed.
@@ -168,6 +185,22 @@ export struct SysGroup {
 }
 
 // A recommended scanner: what to run is shown as text, never executed by the app.
+// A device found by the manual network scan. `kind`: 0 unknown, 1 router, 2 this computer, 3 TV or speaker, 4 printer,
+// 5 camera, 6 computer or server, 7 phone or tablet (a guess, see core::lan::kind_of). `ports` are the ordinary open
+// ports and `risky-ports` the risky ones, both built in Rust; `shared` counts other addresses with the same MAC.
+export struct LanHost {
+    ip: string,
+    mac: string,
+    name: string,
+    vendor: string,
+    model: string,
+    kind: int,
+    shared: int,
+    ports: string,
+    risky-ports: string,
+    risky: bool,
+}
+
 export struct SecTool {
     name: string,
     cmd: string,
@@ -211,6 +244,34 @@ export global Tr {
         if (group == 4) { return @tr("Main" => "Browser add-ons"); }
         return @tr("Main" => "Updates");
     }
+    public pure function lan-kind(kind: int) -> string {
+        if (kind == 1) { return @tr("Main" => "Router"); }
+        if (kind == 2) { return @tr("Main" => "This computer"); }
+        if (kind == 3) { return @tr("Main" => "TV or speaker"); }
+        if (kind == 4) { return @tr("Main" => "Printer"); }
+        if (kind == 5) { return @tr("Main" => "Camera"); }
+        if (kind == 6) { return @tr("Main" => "Computer or server"); }
+        if (kind == 7) { return @tr("Main" => "Phone or tablet"); }
+        return @tr("Main" => "Device");
+    }
+    public pure function lan-icon(kind: int) -> image {
+        if (kind == 1) { return @image-url("icons/router.svg"); }
+        if (kind == 2 || kind == 6) { return @image-url("icons/monitor.svg"); }
+        if (kind == 3) { return @image-url("icons/tv.svg"); }
+        if (kind == 4) { return @image-url("icons/printer.svg"); }
+        if (kind == 5) { return @image-url("icons/cctv.svg"); }
+        if (kind == 7) { return @image-url("icons/smartphone.svg"); }
+        return @image-url("icons/circle-help.svg");
+    }
+    // The second line of a device: what it probably is (when the title is its name), model and maker, then a note when
+    // other addresses answer with the same hardware address. Never empty, so every row has the same height.
+    public pure function lan-clue(kind: int, named: bool, model: string, vendor: string, shared: int) -> string {
+        let a = named && kind != 0 ? lan-kind(kind) : "";
+        let b = model == "" ? a : a == "" ? model : a + " · " + model;
+        let c = vendor == "" ? b : b == "" ? vendor : b + " · " + vendor;
+        let d = shared == 0 ? c : c == "" ? @tr("Main" => "Hardware address shared by {} addresses", shared + 1) : c + " · " + @tr("Main" => "Hardware address shared by {} addresses", shared + 1);
+        return d != "" ? d : @tr("Main" => "Unknown maker");
+    }
     public pure function finding-line(code: int, subject: string, extra: string, n: int) -> string {
         if (code == 0) { return extra != "" ? @tr("Main" => "{} is open to the network on: {}", extra, subject) : @tr("Main" => "Open to the network on: {} (program unknown: it belongs to another user)", subject); }
         if (code == 1) {
@@ -230,6 +291,23 @@ export global Tr {
         if (code == 12) { return @tr("Main" => "The running kernel {} is no longer installed. Restart to use the new one.", subject); }
         if (code == 13) { return extra != "" ? @tr("Main" => "{} updates waiting, {} of them security updates (as of the last package list refresh)", n, extra) : @tr("Main" => "{} updates waiting (as of the last package list refresh)", n); }
         if (code == 14) { return @tr("Main" => "Packages held back from updates: {}", subject); }
+        // 19 to 22: the same checks as 15 to 18 when they found nothing (level -1 on the page).
+        if (code == 19) { return n == 3 ? @tr("Main" => "Wi-Fi: {} is protected (WPA2 or better).", subject) : @tr("Main" => "Wi-Fi: not connected to a Wi-Fi network."); }
+        if (code == 20) { return @tr("Main" => "Wi-Fi: no saved open network joins by itself."); }
+        if (code == 21) { return @tr("Main" => "Proxy: none set for the system or the desktop."); }
+        if (code == 22) { return @tr("Main" => "Root certificates: none added by hand."); }
+        if (code == 23) { return @tr("Main" => "The SSH server accepts: {}. Anyone who can reach it can guess passwords; use keys only.", subject); }
+        if (code == 24) { return n == 0 ? @tr("Main" => "SSH server: not running.") : @tr("Main" => "SSH server: running with passwords and root login off."); }
+        if (code == 25) { return @tr("Main" => "/etc/hosts sends names to public addresses: {}. This can redirect a site.", subject); }
+        if (code == 26) { return @tr("Main" => "/etc/hosts: no name is redirected to a public address."); }
+        if (code == 27) { return @tr("Main" => "One hardware address answers for several network addresses: {}. A router can do this, but so can someone pretending to be it.", subject); }
+        if (code == 28) { return @tr("Main" => "Network neighbours: no hardware address answers for more than one address."); }
+        if (code == 29) { return @tr("Main" => "File shares open to anyone on the network, no password: {}.", subject); }
+        if (code == 30) { return n == 0 ? @tr("Main" => "File sharing: Samba and NFS are not running.") : @tr("Main" => "File sharing: no Samba or NFS share is open to everyone."); }
+        if (code == 15) { return n == 0 ? @tr("Main" => "You are connected to the open Wi-Fi network {}. Anyone nearby can read what you send over it.", subject) : n == 1 ? @tr("Main" => "The Wi-Fi network {} uses WEP, which can be broken in minutes.", subject) : @tr("Main" => "The Wi-Fi network {} uses WPA1, an outdated protection.", subject); }
+        if (code == 16) { return @tr("Main" => "Open Wi-Fi networks that this computer joins by itself: {}. Any hotspot with the same name will be trusted.", subject); }
+        if (code == 17) { return n == 0 ? @tr("Main" => "Every program is told to use a proxy (/etc/environment): {}", subject) : @tr("Main" => "The desktop proxy is set to {}. A proxy sees all your web traffic; check it is yours.", subject); }
+        if (code == 18) { return @tr("Main" => "Root certificates added by hand: {}. Whoever holds their keys can read your HTTPS traffic.", subject); }
         return @tr("Main" => "The firewall (ufw) is {}. Rules were not read; that needs administrator rights.", subject);
     }
     // Under an application header the name is already shown, so the two network lines drop it.
@@ -249,16 +327,19 @@ export global Tr {
     public pure function error-line(device: string, count: int, line: string) -> string {
         return @tr("Main" => "{} failed to read or write data {} times. System message: {}", device != "" ? device : @tr("Main" => "A disk"), count, line);
     }
+    public pure function log-unread-line() -> string {
+        return @tr("Main" => "The kernel log could not be read in time, so disk errors may be missing. Scan again.");
+    }
     public pure function failed-mount-line(mount: string) -> string {
         return @tr("Main" => "{} failed to mount. Check that its disk or network share is connected.", mount);
     }
-    public pure function memory-line(code: int, a: string) -> string {
+    public pure function memory-line(code: int, a: string, b: string) -> string {
         if (code == 0) { return @tr("Main" => "Swap is set up ({}).", a); }
         if (code == 1) { return @tr("Main" => "No swap is set up."); }
         if (code == 2) { return @tr("Main" => "{} is running and will stop a program that uses all the memory.", a); }
         if (code == 3) { return @tr("Main" => "Nothing is watching for low memory (systemd-oomd or earlyoom)."); }
         if (code == 4) { return @tr("Main" => "The kernel killed {} programs for lack of memory since the previous boot.", a); }
-        return @tr("Main" => "Without swap or a watcher, the computer can freeze for minutes when memory runs out. To add a watcher, run: {}", a);
+        return @tr("Main" => "zram is only {} MB for {} GB of memory, so it fills up fast. Open the help below to make it bigger.", a, b);
     }
     // System page words; Rust passes the data and builds the rows and the "Copy all" text from these.
     public pure function sys-group(code: int) -> string {
@@ -384,6 +465,9 @@ export global Tr {
 export global Theme {
     // Grey of an area that has not been scanned yet.
     out property <color> muted: Family.muted;
+    // True while the open page is still scanning (set from `Main.page-loading`): Tile and Section then show a
+    // placeholder instead of a value nobody has measured yet.
+    in-out property <bool> loading;
     // Categories, not status: the boot chart and the Debian chip.
     out property <color> purple: #8b5cf6;
     // Area status: 0 not scanned, 1 fine, 2 worth a look, 3 problem.
@@ -461,26 +545,28 @@ component DangerButton inherits Rectangle {
     in property <string> text;
     // Neutral colours for clean-ups the Safe and Almost safe tabs already vouch for; red stays for the rest.
     in property <bool> calm;
+    in property <bool> enabled: true;
     callback clicked();
     width: label.preferred-width + 46px;
     height: 32px;
+    opacity: root.enabled ? 1 : 0.5;
     border-width: 1px;
     border-color: root.calm ? Palette.border : Family.danger;
     border-radius: Family.control-radius;
     background: ta.has-hover ? (root.calm ? Palette.foreground.with-alpha(0.1) : Family.danger.with-alpha(0.15)) : transparent;
     accessible-role: button;
     accessible-label: root.text;
-    accessible-action-default => { root.clicked(); }
+    accessible-action-default => { if (root.enabled) { root.clicked(); } }
     Icon { x: 12px; y: (parent.height - 16px) / 2; width: 16px; height: 16px; source: @image-url("icons/trash.svg"); tone: root.calm ? Palette.foreground : Family.danger; }
     label := Text { x: 34px; width: parent.width - 46px; text: root.text; color: root.calm ? Palette.foreground : Family.danger; font-weight: root.calm ? 400 : Family.section-weight; horizontal-alignment: left; vertical-alignment: center; }
     // Focus ring in the accent colour, outside the red border, so a keyboard user can see where they are.
     if fs.has-focus : Rectangle { x: -3px; y: -3px; width: parent.width + 6px; height: parent.height + 6px; border-width: 2px; border-color: Palette.accent-background; border-radius: 6px; }
     fs := FocusScope {
         key-pressed(event) => {
-            if (event.text == Key.Return || event.text == " ") { root.clicked(); return accept; }
+            if (root.enabled && (event.text == Key.Return || event.text == " ")) { root.clicked(); return accept; }
             return reject;
         }
-        ta := TouchArea { mouse-cursor: pointer; clicked => { fs.focus(); root.clicked(); } }
+        ta := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { fs.focus(); root.clicked(); } }
     }
 }
 
@@ -635,6 +721,8 @@ component ServiceItem inherits VerticalLayout {
     callback toggle();
     callback act();
     callback run();
+    callback search();
+    callback docs();
     spacing: 0px;
 
     Rectangle {
@@ -696,6 +784,45 @@ component ServiceItem inherits VerticalLayout {
             color: Palette.foreground;
         }
         if root.item.active : Text { text: @tr("Main" => "Running now."); color: Family.muted; font-size: Family.body; }
+        if root.item.delay > 0 : Text {
+            text: @tr("Main" => "Held back the desktop for {} s at the last boot.", root.item.delay);
+            wrap: word-wrap;
+            color: Family.warning;
+        }
+        if root.item.failed : Text { text: @tr("Main" => "Failed the last time it ran."); wrap: word-wrap; color: Family.danger; }
+        if root.item.restarts > 0 : Text {
+            text: @tr("Main" => "Restarted {} times since boot.", root.item.restarts);
+            wrap: word-wrap;
+            color: Family.warning;
+        }
+        if root.item.triggers != "" : Text {
+            text: @tr("Main" => "Started on demand by {}: disabling it may not keep it from starting.", root.item.triggers);
+            wrap: word-wrap;
+            color: Family.muted;
+            font-size: Family.body;
+        }
+        if root.item.active && root.item.memory-mb > 0 : Text {
+            text: @tr("Main" => "Uses {} of memory and has used {} s of CPU.", Theme.size(root.item.memory-mb), root.item.cpu-secs);
+            wrap: word-wrap;
+            color: Family.muted;
+            font-size: Family.body;
+        }
+        Text {
+            text: root.item.sysv ? @tr("Main" => "Old-style startup script in /etc/init.d, usually added by a vendor's installer.")
+                : root.item.package != "" ? @tr("Main" => "From the {} package.", root.item.package)
+                : root.item.packaged ? @tr("Main" => "Not from a package: added by a vendor's installer or by hand.") : "";
+            visible: self.text != "";
+            height: self.text == "" ? 0px : self.preferred-height;
+            wrap: word-wrap;
+            color: Family.muted;
+            font-size: Family.body;
+        }
+        if root.item.man != "" : Text {
+            text: @tr("Main" => "Manual: man {}", root.item.man);
+            wrap: word-wrap;
+            color: Family.muted;
+            font-size: Family.body;
+        }
         if root.item.background : Text {
             text: @tr("Main" => "Runs from a timer after boot, so it does not slow down the boot.");
             wrap: word-wrap;
@@ -713,6 +840,14 @@ component ServiceItem inherits VerticalLayout {
             Button {
                 text: root.item.active ? @tr("Main" => "Stop") : @tr("Main" => "Start");
                 clicked => { root.run(); }
+            }
+            Button {
+                text: @tr("Main" => "Search the web");
+                clicked => { root.search(); }
+            }
+            if root.item.doc-url != "" : Button {
+                text: @tr("Main" => "Documentation");
+                clicked => { root.docs(); }
             }
         }
     }
@@ -745,7 +880,7 @@ component AppItem inherits VerticalLayout {
                 Text { text: root.item.id; color: Family.muted; font-size: Family.body; overflow: elide; }
             }
             Text {
-                text: Theme.size(root.item.size-mb);
+                text: root.item.source == 3 ? "–" : Theme.size(root.item.size-mb);
                 width: 80px;
                 color: Family.muted;
                 font-size: Family.body;
@@ -763,7 +898,7 @@ component AppItem inherits VerticalLayout {
             VerticalLayout {
                 alignment: center;
                 width: 80px;
-                NeutralBadge { text: root.item.source == 0 ? "Debian" : root.item.source == 1 ? "Flatpak" : "AppImage"; }
+                NeutralBadge { text: root.item.source == 0 ? "Debian" : root.item.source == 1 ? "Flatpak" : root.item.source == 2 ? "AppImage" : @tr("Main" => "Other"); }
             }
             if root.rec-filter == 0 : VerticalLayout {
                 alignment: center;
@@ -807,7 +942,13 @@ component AppItem inherits VerticalLayout {
             color: Family.muted;
             font-size: Family.body;
         }
-        HorizontalLayout {
+        if root.item.source == 3 : Text {
+            text: @tr("Main" => "Not installed from a package or Flatpak. Use its own uninstaller to remove it.");
+            wrap: word-wrap;
+            color: Family.muted;
+            font-size: Family.body;
+        }
+        if root.item.source != 3 : HorizontalLayout {
             alignment: start;
             DangerButton {
                 text: root.item.source == 2 ? @tr("Main" => "Move to Trash") : @tr("Main" => "Uninstall");
@@ -850,7 +991,7 @@ component LeftItem inherits VerticalLayout {
                 vertical-alignment: center;
             }
             VerticalLayout { alignment: center; IconButton { source: @image-url("icons/folder.svg"); label: @tr("Main" => "Open folder"); clicked => { root.open(); } } }
-            VerticalLayout { alignment: center; Button { text: @tr("Main" => "Move to Trash"); clicked => { root.act(); } } }
+            VerticalLayout { alignment: center; DangerButton { text: @tr("Main" => "Move to Trash"); clicked => { root.act(); } } }
         }
     }
 
@@ -978,7 +1119,9 @@ component Tile inherits Rectangle {
         VerticalLayout {
             spacing: 2px;
             horizontal-stretch: 1;
-            Text { text: root.value; font-size: Family.page-title; font-weight: Family.page-weight; color: root.tone; overflow: elide; }
+            // While scanning: a grey block the height of the number, so no "0" passes as a result.
+            if Theme.loading : Rectangle { height: Family.page-title * 1.3; Rectangle { x: 0px; y: (parent.height - 18px) / 2; width: 56px; height: 18px; border-radius: Family.radius; background: Palette.foreground.with-alpha(0.10); } }
+            if !Theme.loading : Text { text: root.value; font-size: Family.page-title; font-weight: Family.page-weight; color: root.tone; overflow: elide; }
             Text { text: root.label; font-size: Family.body; color: Family.muted; overflow: elide; }
         }
     }
@@ -1039,7 +1182,9 @@ component Section inherits Rectangle {
             if root.icon.width > 0 : VerticalLayout { alignment: center; Icon { source: root.icon; width: 18px; height: 18px; } }
             if root.tier >= 0 : VerticalLayout { alignment: center; Icon { source: Theme.tier-icon(root.tier); tone: Theme.tier-tone(root.tier); width: 18px; height: 18px; } }
             Text { text: root.title; font-size: Family.title; font-weight: Family.section-weight; color: Palette.foreground; vertical-alignment: center; horizontal-stretch: 1; wrap: word-wrap; }
-            if root.empty != "" : HorizontalLayout {
+            // The sentence is a result, so it waits for the scan too.
+            if root.empty != "" && Theme.loading : Text { text: @tr("Main" => "Working..."); color: Family.muted; font-size: Family.body; vertical-alignment: center; horizontal-alignment: right; horizontal-stretch: 2; }
+            if root.empty != "" && !Theme.loading : HorizontalLayout {
                 spacing: 6px;
                 horizontal-stretch: 2;
                 alignment: end;
@@ -1107,12 +1252,76 @@ component Empty inherits HorizontalLayout {
     Text { text: root.text; color: Family.success; wrap: word-wrap; horizontal-stretch: 1; vertical-alignment: center; }
 }
 
+// A shell command to copy: monospace on a darker tint so it reads apart from the sentences around it.
+component Command inherits Rectangle {
+    in property <string> text;
+    in property <string> title;
+    property <length> top: root.title == "" || root.text == "" ? 10px : 16px + head.preferred-height;
+    background: Palette.foreground.with-alpha(0.08);
+    border-radius: 6px;
+    height: root.text == "" ? 0px : root.top + box.preferred-height + 10px;
+    head := Text { x: 10px; y: 10px; width: parent.width - 52px; text: root.text == "" ? "" : root.title; wrap: word-wrap; font-size: Family.body; font-weight: Family.section-weight; color: Palette.foreground; }
+    box := TextInput { x: 10px; y: root.top; width: parent.width - 52px; read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; wrap: word-wrap; font-family: "DejaVu Sans Mono"; font-size: Family.body; color: Palette.foreground; text: root.text; }
+    // Copies through the TextInput itself (no clipboard crate), like "Copy all" on System.
+    property <bool> copied: false;
+    Timer { interval: 1.5s; running: root.copied; triggered => { root.copied = false; } }
+    copy-btn := Rectangle {
+        x: parent.width - 34px;
+        y: 6px;
+        width: 28px;
+        height: 28px;
+        visible: root.text != "";
+        border-radius: Family.control-radius;
+        background: copy-ta.has-hover ? Palette.foreground.with-alpha(0.1) : copy-fs.has-focus ? Palette.foreground.with-alpha(0.06) : transparent;
+        accessible-role: button;
+        accessible-label: root.copied ? @tr("Main" => "Copied") : @tr("Main" => "Copy command");
+        accessible-action-default => { root.do-copy(); }
+        if copy-fs.has-focus : Rectangle {
+            x: -2px;
+            y: -2px;
+            width: parent.width + 4px;
+            height: parent.height + 4px;
+            border-width: 2px;
+            border-color: Palette.accent-background;
+            border-radius: Family.control-radius + 2px;
+        }
+        Icon {
+            source: root.copied ? @image-url("icons/circle-check.svg") : @image-url("icons/copy.svg");
+            tone: root.copied ? Family.success : Palette.foreground.with-alpha(0.62);
+            width: 16px;
+            height: 16px;
+        }
+        copy-fs := FocusScope {
+            key-pressed(event) => {
+                if event.text == Key.Return || event.text == " " {
+                    root.do-copy();
+                    return accept;
+                }
+                return reject;
+            }
+            copy-ta := TouchArea { mouse-cursor: pointer; clicked => { copy-fs.focus(); root.do-copy(); } }
+        }
+    }
+    function do-copy() {
+        box.select-all();
+        box.copy();
+        box.clear-selection();
+        root.copied = true;
+    }
+}
+
 // A quiet "what is this?" link that opens a tinted, selectable panel with a longer explanation. Click rather than hover
 // because the text is paragraphs, must be selectable and must work from the keyboard. Put it in a card body, never
 // inside a `link` Section (its whole-card TouchArea would take the click).
 component LearnMore inherits VerticalLayout {
     in property <string> label;
     in property <string> text;
+    in property <string> code;
+    in property <string> code-title;
+    in property <string> code2;
+    in property <string> code2-title;
+    in property <string> code3;
+    in property <string> code3-title;
     in-out property <bool> open;
     spacing: 6px;
     HorizontalLayout {
@@ -1143,8 +1352,12 @@ component LearnMore inherits VerticalLayout {
     if root.open : Rectangle {
         background: Palette.foreground.with-alpha(0.05);
         border-radius: 6px;
-        height: panel.preferred-height + 20px;
-        panel := TextInput { x: 10px; y: 10px; width: parent.width - 20px; read-only: true; wrap: word-wrap; font-size: Family.body; color: Palette.foreground; text: root.text; }
+        // Placed by hand: a wrapped TextInput inside a nested layout reports the wrong height.
+        height: panel.preferred-height + 20px + (root.code == "" ? 0px : cmd.height + 10px) + (root.code2 == "" ? 0px : cmd2.height + 10px) + (root.code3 == "" ? 0px : cmd3.height + 10px);
+        panel := TextInput { x: 10px; y: 10px; width: parent.width - 20px; read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; wrap: word-wrap; font-size: Family.body; color: Palette.foreground; text: root.text; }
+        cmd := Command { x: 10px; y: panel.preferred-height + 20px; width: parent.width - 20px; text: root.code; title: root.code-title; }
+        cmd2 := Command { x: 10px; y: cmd.y + cmd.height + 10px; width: parent.width - 20px; text: root.code2; title: root.code2-title; }
+        cmd3 := Command { x: 10px; y: cmd2.y + (root.code2 == "" ? 0px : cmd2.height + 10px); width: parent.width - 20px; text: root.code3; title: root.code3-title; }
     }
 }
 
@@ -1194,9 +1407,14 @@ export component Main inherits Window {
     // Disk health page, scanned on the first visit. `disk-warning` also shows a note on the Boot page.
     in property <bool> health-busy;
     in property <bool> disk-warning;
+    // A disk's SMART check says failing (set when SMART is read).
+    in property <bool> smart-failing;
     in property <string> other-problems;
     in property <string> crashes;
-    in property <string> mem-text;
+    in property <string> swap-text;
+    in property <string> watcher-text;
+    in property <bool> zram-small;
+    in-out property <bool> oom-info-open;
     // No swap and no watcher, with a freeze or an out-of-memory kill on record: worth a look.
     in property <bool> mem-warning;
     // Only the snapshot script sets it (STATE=expanded): opens the swap/zram explanation.
@@ -1210,6 +1428,8 @@ export component Main inherits Window {
     in property <[SysGroup]> sys-groups;
     // Only the snapshot script sets it (STATE=bottom), to see the end of a long page (System, Disk health).
     in property <bool> scroll-bottom;
+    // Only the snapshot script sets it: how far Space is scrolled, to reach a card in the middle of a long tab.
+    in property <length> space-scroll: 0px;
     in property <string> sys-report;
     in-out property <bool> sys-scanned;
     // Security page, scanned on the first visit.
@@ -1219,6 +1439,7 @@ export component Main inherits Window {
     in property <[Finding]> top-findings;
     // Findings split per topic (index = `Finding.group`) and the topics to show, so no empty wrappers add spacing.
     in property <[[Finding]]> group-findings;
+    in property <[int]> group-counts;
     in property <[int]> shown-groups;
     // The scan already knows ufw is off, so asking for the password to read its rules would tell nothing new.
     in property <bool> fw-off;
@@ -1231,6 +1452,12 @@ export component Main inherits Window {
     // Firewall rules, read on demand (administrator password). `fw-state`: 0 not read, 1 reading, 2 done, 3 failed.
     in property <int> fw-state;
     in property <string> fw-text;
+    // Manual network scans (buttons only). `*-state`: 0 not run, 1 running, 2 done, 3 failed.
+    in property <int> lan-state;
+    in property <[LanHost]> lan-hosts;
+    in property <int> lan-risky;
+    in property <string> nmap-error;
+    in property <bool> nmap-available;
     // Filled by Rust when a preview is ready, then the dialog opens.
     in-out property <bool> boot-confirming;
     in-out property <int> boot-action;
@@ -1255,9 +1482,17 @@ export component Main inherits Window {
     in property <[Left]> big-files;
     in property <[Left]> games;
     in property <[Left]> old-versions;
+    in property <[Left]> steam-leftovers;
     // Build folders: `old-builds` were not touched for `old-days` days (almost safe), `builds` are the newer ones.
     in property <[Left]> builds;
     in property <[Left]> old-builds;
+    // Cargo's download folders, split the same way.
+    in property <[Left]> old-cargo;
+    in property <[Left]> flatpak-caches;
+    in property <[Left]> cargo;
+    // Python `__pycache__` folders, one row per project (`id` = the project folder).
+    in property <[Left]> pycaches;
+    in property <[Left]> browsers;
     // Home Trash entries deleted more than `old-days` days ago (`Left.last` = deletion date).
     in property <[Left]> old-trash;
     in property <[Left]> installers;
@@ -1266,12 +1501,20 @@ export component Main inherits Window {
     in property <int> trash-count;
     in property <float> trash-mb;
     in property <float> journal-mb;
+    // Crash dumps of systemd-coredump: size, how many, and the program that crashed most.
+    in property <float> coredump-mb;
+    in property <int> coredump-count;
+    in property <string> coredump-app;
+    // Rotated logs in /var/log (logrotate's `.1`, `.2.gz`): size and how many.
+    in property <float> rotated-log-mb;
+    in property <int> rotated-log-count;
     in property <float> apt-mb;
     // Timeshift: snapshot count and the date of the oldest; `snap-set-up` is true when its config exists.
     // Duplicate files, found on demand: each group starts with its original (`keep` 5), then the copies. A copy's `path` is its original.
     in property <[Left]> dups;
     in property <bool> dup-busy;
     in property <bool> dup-scanned;
+    in property <[Snap]> snaps;
     in property <int> snap-count;
     in property <string> snap-oldest;
     in property <bool> snap-set-up;
@@ -1287,6 +1530,13 @@ export component Main inherits Window {
             if (root.health-ago >= 0) { root.health-ago += 1; }
             if (root.security-ago >= 0) { root.security-ago += 1; }
         }
+    }
+    // Overview's "Right now" re-samples on its own while the page is open (`settings.refresh_s`).
+    in property <int> refresh-s: 1;
+    Timer {
+        interval: 1s * root.refresh-s;
+        running: root.page == 9 && !root.perf-busy;
+        triggered => { root.perf-rescan(); }
     }
     in property <bool> store-busy;
     in-out property <bool> store-scanned;
@@ -1304,7 +1554,8 @@ export component Main inherits Window {
     // 6 build folder to the Trash (`app-id` = its path), 7 installer to the Trash, 8 empty the Trash, 9 clear a cache,
     // 10 shrink the journal, 11 Docker build cache, 12 Docker stopped containers and untagged images.
     // 13 old tool version to the Trash, 14 stale startup entry, 15 settings of an app that looks gone, 16 APT package
-    // files, 17 duplicate, 18 old Trash entry deleted for good.
+    // files, 17 duplicate, 18 old Trash entry deleted for good, 19 old Timeshift snapshot (`app-id` = its name),
+    // 20 Steam prefix and shader cache of an uninstalled game (`app-id` = the prefix path).
     in-out property <bool> app-confirming;
     in-out property <int> app-action;
     in-out property <int> app-source;
@@ -1324,8 +1575,12 @@ export component Main inherits Window {
     callback health-rescan();
     callback sys-rescan();
     callback perf-rescan();
+    callback base-rescan();
+    in-out property <bool> base-scanned: true;
     callback security-rescan();
     callback firewall-check();
+    callback lan-scan();
+    callback nmap-scan();
     callback smart-check(int, string);
     callback boot-preview(int);
     callback boot-restore-preview();
@@ -1351,6 +1606,9 @@ export component Main inherits Window {
     // Bulk clean-up of a tier (0 safe, 1 almost safe): Rust fills `bulk` and opens the dialog; each tick goes back to
     // Rust, which recomputes the totals and the command lines.
     callback bulk-plan(int);
+    // Review one list of Must analyze (action code, dialog title, the rows): the same dialog, one list.
+    callback bulk-list(int, string, [Left]);
+    in property <string> bulk-title;
     callback bulk-toggle(int);
     callback bulk-apply();
     in-out property <bool> bulk-confirming;
@@ -1376,6 +1634,12 @@ export component Main inherits Window {
         return action == 9 ? @tr("Main" => "Cache: {}", id)
             : action == 6 ? @tr("Main" => "Build folder: {}", id)
             : action == 7 ? @tr("Main" => "Installer: {}", id)
+            : action == 21 ? @tr("Main" => "Python caches: {}", id)
+            : action == 22 ? @tr("Main" => "Crash dumps")
+            : action == 24 ? @tr("Main" => "Old system logs")
+            : action == 23 ? @tr("Main" => "Browser: {}", id)
+            : action == 25 ? @tr("Main" => "Cargo folder: {}", id)
+            : action == 26 ? @tr("Main" => "Flatpak cache: {}", id)
             : action == 13 ? @tr("Main" => "Old tool version: {}", id)
             : action == 18 ? @tr("Main" => "Trash entry: {}", id)
             : action == 2 ? @tr("Main" => "Unused Flatpak runtimes")
@@ -1385,6 +1649,10 @@ export component Main inherits Window {
             : @tr("Main" => "Downloaded package files");
     }
     callback dup-find();
+    // Look only is analysed on request: it walks all of $HOME.
+    callback look-find();
+    in property <bool> look-busy;
+    in property <bool> look-scanned;
     // Opens the data folder of a leftover Flatpak (0) or a cache (1) in the file manager.
     callback open-folder(int, string);
     // Opens a folder, or the folder of a file, from the Storage lists in the file manager.
@@ -1412,6 +1680,13 @@ export component Main inherits Window {
         Palette.color-scheme = root.theme-index == 1 ? ColorScheme.light
             : root.theme-index == 2 ? ColorScheme.dark : ColorScheme.unknown;
     }
+    // Which scans the open page waits for; see Theme.loading.
+    property <bool> page-loading: root.page == 10 ? root.store-busy || root.app-busy
+        : root.page == 7 ? root.health-busy
+        : root.page == 8 ? root.security-busy
+        : root.page == 11 ? root.health-busy || root.security-busy
+        : root.page == 12 ? root.svc-busy || root.boot-busy || root.health-busy : false;
+    changed page-loading => { Theme.loading = root.page-loading; }
     in property <string> version;
     callback set-language(int);
     callback set-theme(int);
@@ -1438,7 +1713,7 @@ export component Main inherits Window {
     in-out property <int> store-group;
     // Set by the snapshot script only: opens every disk's partition list.
     in-out property <bool> show-all-parts;
-    property <int> health-level: !root.health-scanned ? 0 : root.disk-warning ? 3 : 1;
+    property <int> health-level: !root.health-scanned ? 0 : (root.disk-warning || root.smart-failing) ? 3 : 1;
     property <int> security-level: !root.security-scanned ? 0 : root.sec-suspicious > 0 ? 3 : root.sec-look > 0 ? 2 : 1;
     property <int> space-level: !root.store-scanned ? 0 : root.fullest-pct >= 90 ? 3 : root.fullest-pct >= 70 ? 2 : 1;
     // Speed also carries the memory safety net (it moved here from Disk health): a warning there makes it "worth a look".
@@ -1448,8 +1723,10 @@ export component Main inherits Window {
         : (root.health-level == 0 || root.security-level == 0) ? 0 : 1;
 
     // Opens a page and starts the scans it needs on the first visit (the dashboards ask for the pages they summarise).
-    function go(p: int) {
+    public function go(p: int) {
         root.page = p;
+        // Started with `--tab-system`: the Startup, Services, Boot and Apps scans were skipped until now.
+        if p != 13 && !root.base-scanned { root.base-scanned = true; root.base-rescan(); }
         // The search box of the page left behind is gone; keep typed letters going to the new page.
         content-keys.focus();
         if p == 9 && !root.perf-busy { root.perf-rescan(); }
@@ -1574,6 +1851,21 @@ export component Main inherits Window {
             // the rows, whose own 12px right padding keeps it off the chevrons.
             spacing: 12px;
 
+            // One thin bar for every scanning page: a segment slides across while Theme.loading.
+            if Theme.loading : Rectangle {
+                height: 3px;
+                border-radius: 1.5px;
+                clip: true;
+                background: Palette.foreground.with-alpha(0.08);
+                Rectangle {
+                    width: parent.width * 0.3;
+                    height: parent.height;
+                    border-radius: 1.5px;
+                    background: Family.info;
+                    x: (parent.width * 1.3) * Math.mod(animation-tick() / 1.4s, 1) - parent.width * 0.3;
+                }
+            }
+
             if root.error != "" : Rectangle {
                 background: Family.danger;
                 border-radius: 6px;
@@ -1689,6 +1981,8 @@ export component Main inherits Window {
                                 open: root.open-unit == r.unit;
                                 toggle => { root.open-unit = root.open-unit == r.unit ? "" : r.unit; }
                                 run => { root.svc-run(r.unit, !r.active); }
+                                docs => { root.open-url(r.doc-url); }
+                                search => { root.open-url("https://duckduckgo.com/?q=" + r.unit + "+linux"); }
                                 act => {
                                     if (r.enabled) {
                                         root.svc-precheck(r);
@@ -2011,7 +2305,7 @@ export component Main inherits Window {
                         // One box per topic; Network is always there because it also holds the firewall check.
                         for g in root.shown-groups : Section {
                             title: Tr.finding-group(g);
-                            total: root.group-findings[g].length > 0 ? "\{root.group-findings[g].length}" : "";
+                            total: root.group-counts[g] > 0 ? "\{root.group-counts[g]}" : "";
                             if g == 0 && root.group-findings[0].length > 0 : Text {
                                 text: @tr("Main" => "Anyone on your network can try to connect to the open ports listed here.");
                                 wrap: word-wrap;
@@ -2038,6 +2332,72 @@ export component Main inherits Window {
                                 if root.fw-state == 1 : TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: @tr("Main" => "Working..."); color: Family.muted; }
                                 if root.fw-state == 2 : TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: root.fw-text; wrap: word-wrap; font-family: "DejaVu Sans Mono"; font-size: Family.body; color: Palette.foreground; }
                                 if root.fw-state == 3 : TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: root.fw-text; wrap: word-wrap; color: Family.danger; }
+                            }
+                            if g == 0 : VerticalLayout {
+                                spacing: 6px;
+                                Text {
+                                    text: @tr("Main" => "Shows which devices are on your network and which risky doors they leave open. It tries a connection to every address, so scan only networks you own or may scan.");
+                                    wrap: word-wrap;
+                                    color: Family.muted;
+                                    font-size: Family.body;
+                                }
+                                HorizontalLayout {
+                                    alignment: start;
+                                    spacing: 8px;
+                                    Button { text: @tr("Main" => "Scan local network"); enabled: root.lan-state != 1; clicked => { root.lan-scan(); } }
+                                    Button { text: @tr("Main" => "Scan with nmap"); enabled: root.nmap-available && root.lan-state != 1; clicked => { root.nmap-scan(); } }
+                                }
+                                if !root.nmap-available : Text { text: @tr("Main" => "nmap is not installed: sudo apt install nmap"); color: Family.muted; font-size: Family.body; }
+                                if root.lan-state == 1 : Text { text: @tr("Main" => "Working..."); color: Family.muted; }
+                                if root.lan-state == 3 : Text { text: @tr("Main" => "No local network found (a VPN is not scanned)."); color: Family.danger; }
+                                if root.lan-state == 4 : TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: root.nmap-error != "" ? root.nmap-error : @tr("Main" => "nmap failed."); wrap: word-wrap; color: Family.danger; }
+                                if root.lan-state == 2 && root.lan-hosts.length == 0 : Text { text: @tr("Main" => "No device answered."); color: Family.muted; }
+                                if root.lan-state == 2 && root.lan-hosts.length > 0 : Text { text: @tr("Main" => "Devices found: {}. With a risky open port: {}.", root.lan-hosts.length, root.lan-risky); color: Family.muted; font-size: Family.body; }
+                                for h in root.lan-hosts : VerticalLayout {
+                                    Rectangle { height: 1px; background: Palette.border; }
+                                    HorizontalLayout {
+                                        padding-top: 7px;
+                                        padding-bottom: 7px;
+                                        spacing: 12px;
+                                        VerticalLayout {
+                                            alignment: start;
+                                            padding-top: 1px;
+                                            width: 18px;
+                                            Icon { width: 18px; height: 18px; source: Tr.lan-icon(h.kind); tone: Family.muted; accessible-role: none; }
+                                        }
+                                        VerticalLayout {
+                                            horizontal-stretch: 1;
+                                            Text { text: h.name != "" ? h.name : Tr.lan-kind(h.kind); overflow: elide; color: h.name != "" ? Palette.foreground : Family.muted; font-weight: Family.section-weight; }
+                                            Text { text: Tr.lan-clue(h.kind, h.name != "", h.model, h.vendor, h.shared); overflow: elide; color: Family.muted; font-size: Family.caption; }
+                                        }
+                                        VerticalLayout {
+                                            width: 130px;
+                                            Text { text: h.ip; color: Palette.foreground; }
+                                            Text { text: h.mac; overflow: elide; color: Family.muted; font-size: Family.caption; }
+                                        }
+                                        VerticalLayout {
+                                            width: 250px;
+                                            if h.risky-ports != "" : TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: h.risky-ports; wrap: word-wrap; color: Family.warning; }
+                                            if h.ports != "" : TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: h.ports; wrap: word-wrap; color: Palette.foreground; }
+                                            if h.ports == "" && h.risky-ports == "" : Text { text: @tr("Main" => "no open ports found"); color: Family.muted; }
+                                        }
+                                        VerticalLayout {
+                                            alignment: start;
+                                            padding-top: 2px;
+                                            width: 16px;
+                                            if h.risky : Icon {
+                                                width: 16px;
+                                                height: 16px;
+                                                source: @image-url("icons/triangle-alert.svg");
+                                                tone: Family.warning;
+                                                accessible-role: text;
+                                                accessible-label: @tr("Main" => "Worth a look");
+                                            }
+                                        }
+                                    }
+                                }
+                                Rectangle { height: 8px; }
+                                Rectangle { height: 1px; background: Palette.border; }
                             }
                             for f[i] in root.group-findings[g] : VerticalLayout {
                                 spacing: 6px;
@@ -2071,10 +2431,10 @@ export component Main inherits Window {
                                         if f.level != 2 : Icon {
                                             width: 16px;
                                             height: 16px;
-                                            source: f.level == 1 ? @image-url("icons/triangle-alert.svg") : @image-url("icons/info.svg");
-                                            tone: f.level == 1 ? Family.warning : Family.info;
+                                            source: f.level == 1 ? @image-url("icons/triangle-alert.svg") : f.level < 0 ? @image-url("icons/circle-check.svg") : @image-url("icons/info.svg");
+                                            tone: f.level == 1 ? Family.warning : f.level < 0 ? Family.success : Family.info;
                                             accessible-role: text;
-                                            accessible-label: f.level == 1 ? @tr("Main" => "Worth a look") : @tr("Main" => "Info");
+                                            accessible-label: f.level == 1 ? @tr("Main" => "Worth a look") : f.level < 0 ? @tr("Main" => "Checked, fine") : @tr("Main" => "Info");
                                         }
                                     }
                                 }
@@ -2110,7 +2470,7 @@ export component Main inherits Window {
                     Button { text: @tr("Main" => "Scan again"); icon: @image-url("icons/refresh.svg"); colorize-icon: true; enabled: !root.app-busy; clicked => { root.app-rescan(); } }
                 }
                 Text {
-                    text: @tr("Main" => "Programs installed from Debian packages, Flatpak and ~/AppImages. Removing one is always your choice, one at a time, and the size it frees is shown first.");
+                    text: @tr("Main" => "Programs installed from Debian packages, Flatpak and ~/AppImages, plus launchers no package owns. Removing one is always your choice, one at a time, and the size it frees is shown first.");
                     wrap: word-wrap;
                     color: Family.muted;
                 }
@@ -2120,7 +2480,7 @@ export component Main inherits Window {
                     VerticalLayout {
                         spacing: 2px;
                         Text { text: @tr("Main" => "Source"); color: Family.muted; font-size: Family.caption; }
-                        FilterBar { labels: [@tr("Main" => "All"), "Debian", "Flatpak", "AppImage"]; selected <=> root.app-source-filter; }
+                        FilterBar { labels: [@tr("Main" => "All"), "Debian", "Flatpak", "AppImage", @tr("Main" => "Other")]; selected <=> root.app-source-filter; }
                     }
                     VerticalLayout {
                         spacing: 2px;
@@ -2191,6 +2551,7 @@ export component Main inherits Window {
                     Button { text: @tr("Main" => "Scan again"); icon: @image-url("icons/refresh.svg"); colorize-icon: true; enabled: !root.store-busy && !root.app-busy; clicked => { root.storage-rescan(); root.app-rescan(); } }
                 }
                 ScrollView {
+                    content-y: -root.space-scroll;
                     VerticalLayout {
                         alignment: start;
                         spacing: 10px;
@@ -2267,6 +2628,30 @@ export component Main inherits Window {
                         }
 
                         Section {
+                            title: @tr("Main" => "Python caches");
+                            tier: 0;
+                            sub: @tr("Main" => "Compiled Python files (__pycache__) in your projects, one row per project. Python makes them again on the next run. Clearing is permanent.");
+                            empty: root.pycaches.length == 0 ? @tr("Main" => "Nothing found.") : "";
+                            StoreList { items: root.pycaches; calm: true; label: @tr("Main" => "Clear"); can-open: true; open(c) => { root.open-path(c.path); } act(c) => { root.app-precheck(21, 0, c.id, c.size-mb); } }
+                        }
+
+                        Section {
+                            title: @tr("Main" => "Browser caches");
+                            tier: 0;
+                            sub: @tr("Main" => "Cache, crash reports and the on-device AI models of Chrome, Chromium, Brave and Firefox, and the cache of VS Code, VSCodium and Cursor. Logins, cookies, tabs, history and unsaved editor files stay. Close the app first. Clearing is permanent.");
+                            empty: root.browsers.length == 0 ? @tr("Main" => "Nothing found.") : "";
+                            StoreList { items: root.browsers; calm: true; label: @tr("Main" => "Clear"); can-open: true; open(c) => { root.open-path(c.path); } act(c) => { root.app-precheck(23, 0, c.id, c.size-mb); } }
+                        }
+
+                        Section {
+                            title: @tr("Main" => "Flatpak app caches");
+                            tier: 0;
+                            sub: @tr("Main" => "The cache folder of each Flatpak app (~/.var/app/<app>/cache), from 1 MB. The app makes it again. Settings and saved data are not touched. Close the app first. Clearing is permanent.");
+                            empty: root.flatpak-caches.length == 0 ? @tr("Main" => "Nothing found.") : "";
+                            StoreList { items: root.flatpak-caches; calm: true; label: @tr("Main" => "Clear"); can-open: true; open(c) => { root.open-path(c.path); } act(c) => { root.app-precheck(26, 0, c.id, c.size-mb); } }
+                        }
+
+                        Section {
                             title: @tr("Main" => "Downloaded package files");
                             tier: 0;
                             total: @tr("Main" => "{} MB", root.apt-mb);
@@ -2274,7 +2659,7 @@ export component Main inherits Window {
                             empty: root.apt-mb <= 1 ? @tr("Main" => "APT keeps {} MB of downloaded packages. Nothing to clean.", root.apt-mb) : "";
                             if root.apt-mb > 1 : HorizontalLayout {
                                 alignment: start;
-                                Button { text: @tr("Main" => "Clean"); enabled: !root.app-busy; clicked => { root.app-precheck(16, 0, "apt-cache", 0); } }
+                                DangerButton { calm: true; text: @tr("Main" => "Clean"); enabled: !root.app-busy; clicked => { root.app-precheck(16, 0, "apt-cache", 0); } }
                             }
                         }
 
@@ -2286,7 +2671,31 @@ export component Main inherits Window {
                             empty: root.journal-mb <= 105 ? @tr("Main" => "The logs take {} MB. Nothing to shrink.", root.journal-mb) : "";
                             if root.journal-mb > 105 : HorizontalLayout {
                                 alignment: start;
-                                Button { text: @tr("Main" => "Keep 100 MB"); enabled: !root.app-busy; clicked => { root.app-precheck(10, 0, "journal", 0); } }
+                                DangerButton { calm: true; text: @tr("Main" => "Delete old logs"); enabled: !root.app-busy; clicked => { root.app-precheck(10, 0, "journal", 0); } }
+                            }
+                        }
+
+                        Section {
+                            title: @tr("Main" => "Old system logs");
+                            tier: 0;
+                            total: @tr("Main" => "{} MB", root.rotated-log-mb);
+                            sub: root.rotated-log-count > 0 ? @tr("Main" => "{} old copies of the logs in /var/log (the ones named .1, .2.gz and so on). The logs being written now are kept.", root.rotated-log-count) : "";
+                            empty: root.rotated-log-count == 0 ? @tr("Main" => "No old system logs.") : "";
+                            if root.rotated-log-count > 0 : HorizontalLayout {
+                                alignment: start;
+                                DangerButton { calm: true; text: @tr("Main" => "Delete old system logs"); enabled: !root.app-busy; clicked => { root.app-precheck(24, 0, "rotated-logs", 0); } }
+                            }
+                        }
+
+                        Section {
+                            title: @tr("Main" => "Crash dumps");
+                            tier: 0;
+                            total: @tr("Main" => "{} MB", root.coredump-mb);
+                            sub: root.coredump-count > 0 ? @tr("Main" => "Memory copies of crashed programs: {} in total, most from {}. They only help to debug a crash; the crash stays in the system log.", root.coredump-count, root.coredump-app) : "";
+                            empty: root.coredump-count == 0 ? @tr("Main" => "No crash dumps.") : "";
+                            if root.coredump-count > 0 : HorizontalLayout {
+                                alignment: start;
+                                DangerButton { calm: true; text: @tr("Main" => "Delete crash dumps"); enabled: !root.app-busy; clicked => { root.app-precheck(22, 0, "coredumps", 0); } }
                             }
                         }
 
@@ -2296,7 +2705,7 @@ export component Main inherits Window {
                             sub: @tr("Main" => "Docker rebuilds it on the next image build. Containers and images are in Must analyze.");
                             HorizontalLayout {
                                 alignment: start;
-                                Button { text: @tr("Main" => "Prune build cache"); enabled: !root.app-busy; clicked => { root.app-precheck(11, 0, "docker-builder", 0); } }
+                                DangerButton { calm: true; text: @tr("Main" => "Prune build cache"); enabled: !root.app-busy; clicked => { root.app-precheck(11, 0, "docker-builder", 0); } }
                             }
                         }
 
@@ -2314,7 +2723,7 @@ export component Main inherits Window {
                             if root.rt-list != "" : Text { text: root.rt-list; wrap: word-wrap; color: Family.muted; font-size: Family.body; }
                             if root.rt-list != "" : HorizontalLayout {
                                 alignment: start;
-                                Button { text: @tr("Main" => "Remove ({} MB)", root.rt-mb); enabled: !root.app-busy; clicked => { root.app-precheck(2, 1, "flatpak-unused", 0); } }
+                                DangerButton { calm: true; text: @tr("Main" => "Remove ({} MB)", root.rt-mb); enabled: !root.app-busy; clicked => { root.app-precheck(2, 1, "flatpak-unused", 0); } }
                             }
                         }
 
@@ -2327,7 +2736,7 @@ export component Main inherits Window {
                             if root.auto-list != "" : Text { text: root.auto-list; wrap: word-wrap; color: Family.muted; font-size: Family.body; }
                             if root.auto-list != "" : HorizontalLayout {
                                 alignment: start;
-                                Button { text: @tr("Main" => "Remove ({} MB)", root.auto-mb); enabled: !root.app-busy; clicked => { root.app-precheck(3, 0, "apt-autoremove", 0); } }
+                                DangerButton { calm: true; text: @tr("Main" => "Remove ({} MB)", root.auto-mb); enabled: !root.app-busy; clicked => { root.app-precheck(3, 0, "apt-autoremove", 0); } }
                             }
                         }
                         }
@@ -2344,11 +2753,19 @@ export component Main inherits Window {
                         }
 
                         Section {
-                            title: @tr("Main" => "Old build output (target, node_modules)");
+                            title: @tr("Main" => "Old build output (target, node_modules, .venv)");
                             tier: 1;
-                            sub: @tr("Main" => "Found next to a Cargo.toml or package.json and not changed for {} days. They are moved to the Trash and rebuilt by the next build.", root.old-days);
+                            sub: @tr("Main" => "Found next to a Cargo.toml, package.json or Python project file and not changed for {} days. They are moved to the Trash and rebuilt by the next build (a .venv by creating it again).", root.old-days);
                             empty: root.old-builds.length == 0 ? @tr("Main" => "Nothing found.") : "";
                             StoreList { items: root.old-builds; calm: true; label: @tr("Main" => "Move to Trash"); can-open: true; open(b) => { root.open-path(b.id); } act(b) => { root.app-precheck(6, 0, b.id, b.size-mb); } }
+                        }
+
+                        Section {
+                            title: @tr("Main" => "Old Cargo downloads");
+                            tier: 1;
+                            sub: @tr("Main" => "Crates and git sources in ~/.cargo that no build has used for {} days. Cargo downloads or unpacks them again when a project needs them (offline builds fail until then). Clearing is permanent.", root.old-days);
+                            empty: root.old-cargo.length == 0 ? @tr("Main" => "Nothing found.") : "";
+                            StoreList { items: root.old-cargo; calm: true; label: @tr("Main" => "Clear"); can-open: true; open(c) => { root.open-path(c.path); } act(c) => { root.app-precheck(25, 0, c.id, c.size-mb); } }
                         }
 
                         Section {
@@ -2362,7 +2779,7 @@ export component Main inherits Window {
                         Section {
                             title: @tr("Main" => "Old tool versions");
                             tier: 1;
-                            sub: @tr("Main" => "Versions of a tool. The 2 newest and any Proton or Steam tool a game is set to use are kept; only the others can go to the Trash. Official Proton from Steam is removed in Steam (Library, Tools).");
+                            sub: @tr("Main" => "Versions of a tool. The 2 newest and any Proton or Steam tool a game is set to use are kept; only the others can go to the Trash. Official Proton that Steam still lists is removed in Steam (Library, Tools); a folder Steam no longer lists can go to the Trash.");
                             empty: root.old-versions.length == 0 ? @tr("Main" => "Nothing found.") : "";
                             StoreList {
                                 items: root.old-versions;
@@ -2385,11 +2802,41 @@ export component Main inherits Window {
                         if root.store-group == 2 : VerticalLayout {
                         spacing: 10px;
                         Section {
-                            title: @tr("Main" => "Recent build output (target, node_modules)");
+                            title: @tr("Main" => "Recent build output (target, node_modules, .venv)");
                             tier: 2;
                             sub: @tr("Main" => "Build folders changed in the last {} days: you may be working on them. They are moved to the Trash and rebuilt by the next build.", root.old-days);
                             empty: root.builds.length == 0 ? @tr("Main" => "Nothing found.") : "";
+                            action: root.builds.length > 1 ? @tr("Main" => "Review and clean up...") : "";
+                            action-enabled: !root.store-busy && !root.app-busy;
+                            action-clicked => { root.bulk-list(6, @tr("Main" => "Recent build output (target, node_modules, .venv)"), root.builds); }
                             StoreList { items: root.builds; label: @tr("Main" => "Move to Trash"); can-open: true; open(b) => { root.open-path(b.id); } act(b) => { root.app-precheck(6, 0, b.id, b.size-mb); } }
+                        }
+
+                        Section {
+                            title: @tr("Main" => "Recent Cargo downloads");
+                            tier: 2;
+                            sub: @tr("Main" => "Crates and git sources in ~/.cargo used in the last {} days. If you build Rust projects, clearing them only makes Cargo download them again.", root.old-days);
+                            empty: root.cargo.length == 0 ? @tr("Main" => "Nothing found.") : "";
+                            action: root.cargo.length > 1 ? @tr("Main" => "Review and clean up...") : "";
+                            action-enabled: !root.store-busy && !root.app-busy;
+                            action-clicked => { root.bulk-list(25, @tr("Main" => "Recent Cargo downloads"), root.cargo); }
+                            StoreList { items: root.cargo; label: @tr("Main" => "Clear"); can-open: true; open(c) => { root.open-path(c.path); } act(c) => { root.app-precheck(25, 0, c.id, c.size-mb); } }
+                        }
+
+                        Section {
+                            title: @tr("Main" => "Steam leftovers of uninstalled games");
+                            tier: 2;
+                            empty: root.steam-leftovers.length == 0 ? @tr("Main" => "Nothing found.") : "";
+                            action: root.steam-leftovers.length > 1 ? @tr("Main" => "Review and clean up...") : "";
+                            action-enabled: !root.store-busy && !root.app-busy;
+                            action-clicked => { root.bulk-list(20, @tr("Main" => "Steam leftovers of uninstalled games"), root.steam-leftovers); }
+                            Text {
+                                text: @tr("Main" => "Steam keeps the Wine prefix and the shader cache of a game after you uninstall it. A prefix can hold saves that are not in Steam Cloud: open the folder and check before you remove it. Both folders go to the Trash.");
+                                wrap: word-wrap;
+                                color: Family.warning;
+                                font-size: Family.body;
+                            }
+                            StoreList { items: root.steam-leftovers; label: @tr("Main" => "Move to Trash"); can-open: true; open(v) => { root.open-path(v.path); } act(v) => { root.app-precheck(20, 0, v.path, v.size-mb); } }
                         }
 
                         Section {
@@ -2420,7 +2867,7 @@ export component Main inherits Window {
                             empty: root.trash-count == 0 ? @tr("Main" => "The Trash is empty.") : "";
                             if root.trash-count != 0 && root.allow-empty-trash : HorizontalLayout {
                                 alignment: start;
-                                Button { text: @tr("Main" => "Empty the Trash"); enabled: !root.app-busy; clicked => { root.app-precheck(8, 0, "trash", root.trash-mb); } }
+                                DangerButton { text: @tr("Main" => "Empty the Trash"); enabled: !root.app-busy; clicked => { root.app-precheck(8, 0, "trash", root.trash-mb); } }
                             }
                             if root.trash-count != 0 && !root.allow-empty-trash : Text {
                                 text: @tr("Main" => "Emptying the Trash is off, so you can still restore what was cleaned. Turn it on in Preferences to enable it.");
@@ -2435,10 +2882,23 @@ export component Main inherits Window {
                             tier: 2;
                             total: root.snap-count > 0 ? "\{root.snap-count}" : "";
                             Text {
-                                text: root.snap-count > 0 ? @tr("Main" => "{} snapshots, the oldest from {}. They can take a lot of space; open Timeshift to see their size and delete old ones.", root.snap-count, root.snap-oldest) : @tr("Main" => "Timeshift is set up, but its snapshots could not be listed without administrator rights. Open Timeshift to see them.");
+                                text: root.snap-count > 0 ? @tr("Main" => "{} snapshots, the oldest from {}. They can take a lot of space; open Timeshift to see their size. The newest 3 and those from the last 6 months are kept, older ones can be deleted. Snapshots share unchanged files, so the space only comes back when no newer snapshot uses them.", root.snap-count, root.snap-oldest) : @tr("Main" => "Timeshift is set up, but its snapshots could not be listed without administrator rights. Open Timeshift to see them.");
                                 wrap: word-wrap;
                                 color: Palette.foreground;
                                 font-size: Family.body;
+                            }
+                            for s in root.snaps : HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 10px;
+                                height: 34px;
+                                Text { text: s.name; color: Palette.foreground; font-weight: Family.section-weight; vertical-alignment: center; horizontal-stretch: 1; }
+                                if s.keep : VerticalLayout {
+                                    alignment: center;
+                                    width: 170px;
+                                    Chip { text: @tr("Main" => "Kept"); tone: Family.success; }
+                                }
+                                if !s.keep : VerticalLayout { alignment: center; width: 170px; HorizontalLayout { alignment: end; DangerButton { text: @tr("Main" => "Delete"); enabled: !root.app-busy; clicked => { root.app-precheck(19, 0, s.name, 0); } } } }
                             }
                         }
 
@@ -2450,7 +2910,7 @@ export component Main inherits Window {
                             if root.docker.length != 0 : HorizontalLayout {
                                 alignment: start;
                                 spacing: 8px;
-                                Button { text: @tr("Main" => "Prune stopped containers and untagged images"); enabled: !root.app-busy; clicked => { root.app-precheck(12, 0, "docker-system", 0); } }
+                                DangerButton { text: @tr("Main" => "Prune stopped containers and untagged images"); enabled: !root.app-busy; clicked => { root.app-precheck(12, 0, "docker-system", 0); } }
                             }
                         }
 
@@ -2463,7 +2923,7 @@ export component Main inherits Window {
                             if root.res-list != "" : Text { text: root.res-list; wrap: word-wrap; color: Family.muted; font-size: Family.body; }
                             if root.res-list != "" : HorizontalLayout {
                                 alignment: start;
-                                Button {
+                                DangerButton {
                                     text: root.res-mb < 1 ? @tr("Main" => "Remove ({} KB)", Math.round(root.res-mb * 1000)) : @tr("Main" => "Remove ({} MB)", Math.round(root.res-mb * 10) / 10);
                                     enabled: !root.app-busy;
                                     clicked => { root.app-precheck(4, 0, "apt-purge-configs", 0); }
@@ -2487,7 +2947,7 @@ export component Main inherits Window {
                                     width: 170px;
                                     Chip { text: k.running ? @tr("Main" => "Running now, kept") : @tr("Main" => "Newest or fallback, kept"); tone: Family.success; }
                                 }
-                                if !k.keep : VerticalLayout { alignment: center; width: 170px; Button { text: @tr("Main" => "Remove"); enabled: !root.app-busy; clicked => { root.app-precheck(5, 0, k.version, k.size-mb); } } }
+                                if !k.keep : VerticalLayout { alignment: center; width: 170px; HorizontalLayout { alignment: end; DangerButton { text: @tr("Main" => "Remove"); enabled: !root.app-busy; clicked => { root.app-precheck(5, 0, k.version, k.size-mb); } } } }
                             }
                         }
 
@@ -2495,6 +2955,9 @@ export component Main inherits Window {
                             title: @tr("Main" => "Data of uninstalled Flatpaks");
                             tier: 2;
                             empty: root.leftovers.length == 0 ? @tr("Main" => "Nothing to remove.") : "";
+                            action: root.leftovers.length > 1 ? @tr("Main" => "Review and clean up...") : "";
+                            action-enabled: !root.app-busy;
+                            action-clicked => { root.bulk-list(1, @tr("Main" => "Data of uninstalled Flatpaks"), root.leftovers); }
                             for l in root.leftovers : LeftItem {
                                 item: l;
                                 act => { root.app-precheck(1, 1, l.id, l.size-mb); }
@@ -2536,7 +2999,7 @@ export component Main inherits Window {
                                     TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: @tr("Main" => "The program is not installed: {}", s.path); color: Family.muted; font-size: Family.body; }
                                 }
                                 VerticalLayout { alignment: center; IconButton { source: @image-url("icons/folder.svg"); label: @tr("Main" => "Open folder"); clicked => { root.open-autostart(s.id); } } }
-                                VerticalLayout { alignment: center; Button { text: @tr("Main" => "Move to Trash"); enabled: !root.app-busy; clicked => { root.app-precheck(14, 1, s.id, 0); } } }
+                                VerticalLayout { alignment: center; DangerButton { text: @tr("Main" => "Move to Trash"); enabled: !root.app-busy; clicked => { root.app-precheck(14, 1, s.id, 0); } } }
                             }
                         }
                         }
@@ -2544,23 +3007,37 @@ export component Main inherits Window {
                         if root.store-group == 3 : VerticalLayout {
                         spacing: 10px;
                         Section {
+                            title: @tr("Main" => "Look only");
+                            icon: @image-url("icons/info.svg");
+                            sub: @tr("Main" => "Finds the biggest folders and files in your home and your game libraries. It reads all of your home folder, so it can take a while. Only for information: nothing here is offered for removal.");
+                            HorizontalLayout {
+                                alignment: start;
+                                spacing: 8px;
+                                Button { text: root.look-scanned ? @tr("Main" => "Analyze again") : @tr("Main" => "Analyze"); enabled: !root.look-busy; clicked => { root.look-find(); } }
+                                if root.look-busy : Button { text: @tr("Main" => "Stop"); icon: @image-url("icons/stop.svg"); colorize-icon: true; clicked => { root.storage-stop(); } }
+                                if root.look-busy : Text { text: @tr("Main" => "Working..."); color: Family.muted; vertical-alignment: center; }
+                            }
+                        }
+
+                        if root.look-scanned : Section {
                             title: @tr("Main" => "Biggest folders in your home");
                             sub: @tr("Main" => "Only for information: your own files are never offered for removal. Open a folder to look inside.");
                             collapsible: root.top-folders.length != 0;
                             open: true;
-                            empty: root.top-folders.length == 0 && !root.store-busy ? @tr("Main" => "Nothing found.") : "";
+                            empty: root.top-folders.length == 0 ? @tr("Main" => "Nothing found.") : "";
                             StoreList { items: root.top-folders; can-open: true; open(f) => { root.open-folder(2, f.id); } }
                         }
 
-                        Section {
+                        if root.look-scanned : Section {
                             title: @tr("Main" => "Biggest files in your home");
                             sub: @tr("Main" => "Files of 100 MB or more, biggest first. Only for information.");
                             collapsible: root.big-files.length != 0;
+                            open: true;
                             empty: root.big-files.length == 0 ? @tr("Main" => "Nothing found.") : "";
                             StoreList { items: root.big-files; can-open: true; open(f) => { root.open-path(f.path); } }
                         }
 
-                        Section {
+                        if root.look-scanned : Section {
                             title: @tr("Main" => "Game libraries");
                             sub: @tr("Main" => "Steam (all libraries), Heroic and Bottles. Only for information: uninstall a game from its launcher.");
                             empty: root.games.length == 0 ? @tr("Main" => "Nothing found.") : "";
@@ -2609,8 +3086,8 @@ export component Main inherits Window {
                                 icon: @image-url("icons/activity.svg");
                                 status: true;
                                 dot: Theme.level-color(root.health-level);
-                                Text { text: root.disk-warning ? @tr("Main" => "Disk errors") : !root.health-scanned ? @tr("Main" => "Not checked yet") : @tr("Main" => "No disk errors seen"); font-size: 18px; font-weight: Family.section-weight; color: root.disk-warning ? Family.danger : !root.health-scanned ? Theme.muted : Palette.foreground; wrap: word-wrap; }
-                                Text { text: root.disk-warning ? @tr("Main" => "Disk errors were seen since this boot.") : ""; color: Family.muted; font-size: Family.body; }
+                                Text { text: root.disk-warning ? @tr("Main" => "Disk errors") : root.smart-failing ? @tr("Main" => "A disk is failing") : !root.health-scanned ? @tr("Main" => "Not checked yet") : @tr("Main" => "No disk errors seen"); font-size: 18px; font-weight: Family.section-weight; color: (root.disk-warning || root.smart-failing) ? Family.danger : !root.health-scanned ? Theme.muted : Palette.foreground; wrap: word-wrap; }
+                                Text { text: root.disk-warning ? @tr("Main" => "Disk errors were seen since this boot.") : root.smart-failing ? @tr("Main" => "SMART says a disk is failing. Back up your files.") : ""; color: Family.muted; font-size: Family.body; }
                             }
                             }
                             Rectangle {
@@ -2673,16 +3150,13 @@ export component Main inherits Window {
                         Section {
                             title: @tr("Main" => "Right now");
                             icon: @image-url("icons/activity.svg");
-                            badge: root.perf-busy || root.perf-level == 0 ? "" : root.perf-level == 1 ? @tr("Main" => "Fine") : root.perf-level == 2 ? @tr("Main" => "Worth a look") : @tr("Main" => "Problem");
+                            badge: root.perf-level == 0 ? "" : root.perf-level == 1 ? @tr("Main" => "Fine") : root.perf-level == 2 ? @tr("Main" => "Worth a look") : @tr("Main" => "Problem");
                             badge-tone: Theme.level-color(root.perf-level);
-                            action: @tr("Main" => "Refresh");
-                            action-enabled: !root.perf-busy;
-                            action-clicked => { root.perf-rescan(); }
                             Text {
-                                text: root.perf-busy ? @tr("Main" => "Measuring…") : root.perf-level == 0 ? "" : root.perf-cause == 1 ? @tr("Main" => "Short of memory.") : root.perf-cause == 2 ? @tr("Main" => "The processor is busy.") : root.perf-cause == 3 ? @tr("Main" => "The disk is slow to respond.") : @tr("Main" => "Running smoothly.");
+                                text: root.perf-level == 0 ? "" : root.perf-cause == 1 ? @tr("Main" => "Short of memory.") : root.perf-cause == 2 ? @tr("Main" => "The processor is busy.") : root.perf-cause == 3 ? @tr("Main" => "The disk is slow to respond.") : @tr("Main" => "Running smoothly.");
                                 font-size: Family.title;
                                 wrap: word-wrap;
-                                color: root.perf-busy || root.perf-level == 0 ? Theme.muted : Palette.foreground;
+                                color: root.perf-level == 0 ? Theme.muted : Palette.foreground;
                             }
                             if root.perf-level > 0 : VerticalLayout {
                                 spacing: 6px;
@@ -2831,17 +3305,41 @@ export component Main inherits Window {
                         }
                         // Read by the Disk health scan (go() runs it for this page too).
                         Section {
-                            title: @tr("Main" => "Memory safety net");
-                            icon: @image-url("icons/gauge.svg");
-                            if root.health-busy && root.mem-text == "" : Text { text: @tr("Main" => "Working..."); color: Family.muted; }
-                            TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: root.mem-text; wrap: word-wrap; font-size: Family.body; color: root.mem-warning ? Family.warning : Palette.foreground; }
+                            title: @tr("Main" => "Swap");
+                            icon: @image-url("icons/hard-drive.svg");
+                            if root.health-busy && root.swap-text == "" : Text { text: @tr("Main" => "Working..."); color: Family.muted; }
+                            TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: root.swap-text; wrap: word-wrap; font-size: Family.body; color: root.mem-warning ? Family.warning : Palette.foreground; }
                             LearnMore {
                                 label: @tr("Main" => "Swap and zram: what they are");
                                 open <=> root.mem-info-open;
+                                code-title: @tr("Main" => "Install zram swap: in memory, fast, no disk wear");
+                                code: "sudo apt install zram-tools";
+                                code2-title: @tr("Main" => "Set zram to half of the memory");
+                                code2: "sudo sed -i -E 's/^#?PERCENT=.*/PERCENT=50/; s/^#?ALGO=.*/ALGO=zstd/' /etc/default/zramswap && sudo systemctl restart zramswap";
+                                code3-title: @tr("Main" => "Add a swap file: on disk, needed to hibernate");
+                                code3: "sudo fallocate -l 4G /swapfile\nsudo chmod 600 /swapfile\nsudo mkswap /swapfile\nsudo swapon /swapfile\necho '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab";
                                 text: @tr("Main" => "Swap is space the computer uses when memory is full: it moves pages that are not in use out of memory so the rest keeps running. With none, a spike in memory use can freeze the whole desktop until a program is killed.")
                                     + "\n\n" + @tr("Main" => "Traditional swap (a file or partition on the disk) is large and cheap, and is needed to hibernate. But the disk is much slower than memory, so a computer that leans on it feels slow, and it adds writes to an SSD.")
                                     + "\n\n" + @tr("Main" => "zram swap lives in memory and keeps the pages compressed, usually 2 to 3 times smaller. It is fast, uses no disk and wears nothing, but it takes real memory and cannot be used to hibernate. It suits computers with 8 GB or more that only need a buffer for spikes.")
-                                    + "\n\n" + @tr("Main" => "You can use both: zram first, with a small disk swap behind it for hibernation or very large loads. Neither fixes a program that never stops growing; that is what a low-memory watcher (earlyoom) is for.");
+                                    + "\n\n" + @tr("Main" => "You can use both: zram first, with a small disk swap behind it for hibernation or very large loads. Neither fixes a program that never stops growing; that is what a low-memory watcher (earlyoom) is for.")
+                                    + "\n\n" + @tr("Main" => "The swap file command makes a 4 GB file and keeps it after a reboot. It does not suit btrfs or an encrypted setup that needs hibernation; follow your distribution's guide there.")
+                                    + "\n\n" + @tr("Main" => "To set the zram size by hand, open /etc/default/zramswap in a text editor as root. Remove the # in front of PERCENT=50 and ALGO=lz4, then change ALGO to zstd. PERCENT=50 uses half of the memory and replaces the fixed SIZE=256. Save the file and restart zram: sudo systemctl restart zramswap. Or use the command below, which does the same.");
+                            }
+                        }
+                        Section {
+                            title: @tr("Main" => "Low-memory watcher");
+                            icon: @image-url("icons/activity.svg");
+                            if root.health-busy && root.watcher-text == "" : Text { text: @tr("Main" => "Working..."); color: Family.muted; }
+                            TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: root.watcher-text; wrap: word-wrap; font-size: Family.body; color: root.mem-warning ? Family.warning : Palette.foreground; }
+                            LearnMore {
+                                label: @tr("Main" => "What a low-memory watcher does");
+                                open <=> root.oom-info-open;
+                                code-title: @tr("Main" => "Install it (it starts by itself)");
+                                code: "sudo apt install earlyoom";
+                                code2-title: @tr("Main" => "Check that it is running");
+                                code2: "systemctl status earlyoom";
+                                text: @tr("Main" => "When memory runs out, the kernel only stops a program after the desktop has been frozen, sometimes for minutes. Without swap or a watcher the computer can freeze that way.")
+                                    + "\n\n" + @tr("Main" => "A watcher (earlyoom or systemd-oomd) checks the free memory all the time and closes the biggest program before the freeze, so the rest of your work stays safe.");
                             }
                         }
                     }
@@ -3024,9 +3522,16 @@ export component Main inherits Window {
                         : root.app-action == 2 ? @tr("Main" => "Remove unused Flatpak runtimes")
                         : root.app-action == 3 ? @tr("Main" => "Remove packages nothing needs")
                         : root.app-action == 5 ? @tr("Main" => "Remove kernel {}", root.app-id)
-                        : root.app-action == 6 || root.app-action == 7 || root.app-action == 13 || root.app-action == 14 || root.app-action == 15 ? @tr("Main" => "Move to the Trash: {}", root.app-id)
+                        : root.app-action == 19 ? @tr("Main" => "Delete Timeshift snapshot {}", root.app-id)
+                        : root.app-action == 6 || root.app-action == 7 || root.app-action == 13 || root.app-action == 14 || root.app-action == 15 || root.app-action == 20 ? @tr("Main" => "Move to the Trash: {}", root.app-id)
                         : root.app-action == 8 ? @tr("Main" => "Empty the Trash")
                         : root.app-action == 9 ? @tr("Main" => "Clear the cache of {}", root.app-id)
+                        : root.app-action == 21 ? @tr("Main" => "Clear the Python caches in {}", root.app-id)
+                        : root.app-action == 23 ? @tr("Main" => "Clear the cache, crash reports and AI models of {}", root.app-id)
+                        : root.app-action == 25 ? @tr("Main" => "Clear Cargo's {}", root.app-id)
+                        : root.app-action == 26 ? @tr("Main" => "Clear the cache of the Flatpak app {}", root.app-id)
+                        : root.app-action == 22 ? @tr("Main" => "Delete the crash dumps")
+                        : root.app-action == 24 ? @tr("Main" => "Delete the old system logs")
                         : root.app-action == 10 ? @tr("Main" => "Shrink the system journal")
                         : root.app-action == 11 ? @tr("Main" => "Prune the Docker build cache")
                         : root.app-action == 12 ? @tr("Main" => "Prune Docker stopped containers and untagged images")
@@ -3039,8 +3544,8 @@ export component Main inherits Window {
                     color: Palette.foreground;
                 }
                 TextInput { read-only: true; selection-background-color: Palette.selection-background; selection-foreground-color: Palette.selection-foreground; text: root.app-cmd; wrap: word-wrap; font-size: Family.body; color: Palette.foreground; }
-                if root.app-action != 12 && root.app-action != 14 : Text { text: root.app-freed < 1 ? @tr("Main" => "Frees about {} KB.", Math.round(root.app-freed * 1000)) : @tr("Main" => "Frees about {} MB.", Math.round(root.app-freed * 10) / 10); wrap: word-wrap; color: Palette.foreground; font-weight: Family.section-weight; }
-                if (root.app-action == 0 && root.app-source == 0) || (root.app-action >= 3 && root.app-action < 6) || root.app-action == 10 : Text { text: @tr("Main" => "Needs your administrator password."); wrap: word-wrap; color: Family.muted; }
+                if root.app-action != 12 && root.app-action != 14 && root.app-action != 19 : Text { text: root.app-freed < 1 ? @tr("Main" => "Frees about {} KB.", Math.round(root.app-freed * 1000)) : @tr("Main" => "Frees about {} MB.", Math.round(root.app-freed * 10) / 10); wrap: word-wrap; color: Palette.foreground; font-weight: Family.section-weight; }
+                if (root.app-action == 0 && root.app-source == 0) || (root.app-action >= 3 && root.app-action < 6) || root.app-action == 10 || root.app-action == 19 || root.app-action == 22 : Text { text: @tr("Main" => "Needs your administrator password."); wrap: word-wrap; color: Family.muted; }
                 if root.app-note != "" : Text { text: root.app-note; wrap: word-wrap; color: Family.warning; }
                 Text {
                     text: root.app-action == 0 && root.app-source != 2 ? @tr("Main" => "Your settings in your home folder are kept. Install it again to undo.")
@@ -3050,10 +3555,18 @@ export component Main inherits Window {
                         : root.app-action == 4 ? @tr("Main" => "These files in /etc cannot be restored. The packages are already gone.")
                         : root.app-action == 8 ? @tr("Main" => "This cannot be undone.")
                         : root.app-action == 9 ? @tr("Main" => "This cannot be undone. The app rebuilds its cache when it needs it.")
+                        : root.app-action == 21 ? @tr("Main" => "This cannot be undone. Python makes the caches again the next time the project runs.")
+                        : root.app-action == 23 ? @tr("Main" => "This cannot be undone. Close the browser first: it is refused while it runs. Your logins, cookies, tabs and history are kept; the browser downloads or rebuilds the rest when it needs it.")
+                        : root.app-action == 26 ? @tr("Main" => "This cannot be undone. Close the app first: it is refused while it runs. Only its cache folder is cleared, not its settings, logins or saved data. The app rebuilds the cache, though a few apps download things again (offline music, map tiles).")
+                        : root.app-action == 25 ? @tr("Main" => "This cannot be undone. Cargo makes it again on the next build: the registry source from its downloads, the rest by downloading, so a build without network fails until then. ~/.cargo/bin and your login token are kept.")
+                        : root.app-action == 22 ? @tr("Main" => "This cannot be undone. The crashes stay listed by coredumpctl, without their memory copy.")
+                        : root.app-action == 24 ? @tr("Main" => "This cannot be undone. The logs being written now are kept.")
                         : root.app-action == 10 ? @tr("Main" => "Deleted log entries cannot be restored.")
+                        : root.app-action == 19 ? @tr("Main" => "This cannot be undone. The snapshot is removed by Timeshift itself; newer snapshots are not touched.")
                         : root.app-action == 11 ? @tr("Main" => "Docker rebuilds the cache on the next image build. This cannot be undone.")
                         : root.app-action == 12 ? @tr("Main" => "Volumes and images that have a tag are kept. Stopped containers are deleted, which cannot be undone.")
                         : root.app-action == 15 ? @tr("Main" => "Only a guess that the app is gone. If you still use it, you lose its settings and logins until you restore the folder from the Trash.")
+                        : root.app-action == 20 ? @tr("Main" => "The game is not installed. Its Wine prefix may hold saves that are not in Steam Cloud: restore the folders from the Trash if you need them.")
                         : @tr("Main" => "Undo: restore it from the Trash.");
                     wrap: word-wrap;
                     color: Family.muted;
@@ -3094,7 +3607,7 @@ export component Main inherits Window {
                     spacing: 8px;
                     VerticalLayout { alignment: center; Icon { source: Theme.tier-icon(root.bulk-tier); tone: Theme.tier-tone(root.bulk-tier); width: 18px; height: 18px; } }
                     Text {
-                        text: root.bulk-tier == 0 ? @tr("Main" => "Clean up what is safe") : @tr("Main" => "Clean up what is almost safe");
+                        text: root.bulk-title != "" ? root.bulk-title : root.bulk-tier == 0 ? @tr("Main" => "Clean up what is safe") : @tr("Main" => "Clean up what is almost safe");
                         font-size: Family.title;
                         font-weight: Family.section-weight;
                         wrap: word-wrap;
@@ -3103,7 +3616,9 @@ export component Main inherits Window {
                     }
                 }
                 Text {
-                    text: root.bulk-tier == 0
+                    text: root.bulk-tier == 2
+                        ? @tr("Main" => "Each item is checked again before it goes. Untick what you want to keep.")
+                        : root.bulk-tier == 0
                         ? @tr("Main" => "Caches, package files and logs are deleted for good; they come back when needed. Untick what you want to keep.")
                         : @tr("Main" => "Build folders, installers and Trash entries older than {} days, and old tool versions (all but the newest 2). Build folders, installers and tool versions go to the Trash, so you can restore them. Old Trash entries are deleted for good. Untick what you want to keep.", root.old-days);
                     wrap: word-wrap;
@@ -3117,7 +3632,7 @@ export component Main inherits Window {
                         for r[i] in root.bulk : HorizontalLayout {
                             height: 32px;
                             spacing: 10px;
-                            CheckBox { text: root.bulk-label(r.action, r.name); checked: r.on; toggled => { root.bulk-toggle(i); } horizontal-stretch: 1; min-width: 0px; }
+                            CheckBox { text: root.bulk-title != "" ? r.name : root.bulk-label(r.action, r.name); checked: r.on; toggled => { root.bulk-toggle(i); } horizontal-stretch: 1; min-width: 0px; }
                             Text { text: @tr("Main" => "{} MB", r.size-mb); width: 80px; color: Family.muted; font-size: Family.body; horizontal-alignment: right; vertical-alignment: center; }
                         }
                     }

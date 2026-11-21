@@ -14,7 +14,7 @@ use fastcheckup_core::{
     boot::{self, Loader, Phase as BootPhase},
     health,
     history::{self, Kind, Record},
-    perf, security,
+    lan, perf, security,
     services::{self, HintKind},
     settings::{MAX_OLD_DAYS, MIN_OLD_DAYS, Settings},
     storage,
@@ -22,9 +22,22 @@ use fastcheckup_core::{
 };
 use slint::{Model, ModelRc, VecModel};
 
+use bulk::{CANDIDATES, bulk_rows, removal_shown, run_action, run_bulk, show_bulk, tier};
+
 slint::include_modules!();
 
+mod bulk;
+// Canned data for scripts/ui-snapshot.sh only; the release build gets the no-op stub.
+#[cfg(feature = "fixtures")]
 mod fixtures;
+#[cfg(not(feature = "fixtures"))]
+mod fixtures {
+    pub fn mode() -> Option<usize> {
+        None
+    }
+    pub fn apply(_: &crate::Main, _: usize) {}
+    pub fn state(_: &crate::Main, _: i32, _: &str) {}
+}
 mod host;
 mod instance;
 
@@ -51,32 +64,18 @@ fn scan_is_stale() -> bool {
         || SCANNED_EMPTY.load(Relaxed) != ALLOW_EMPTY_TRASH.load(Relaxed)
 }
 
-/// What the last Storage scan offers to the bulk clean-up: `(action, id, bytes)`. Rechecked by each action when it runs.
-static CANDIDATES: Mutex<Vec<(i32, String, u64)>> = Mutex::new(Vec::new());
-
-/// The tier of a bulk action: 0 safe, 1 almost safe (old), 2 needs a look.
-fn tier(action: i32) -> i32 {
-    match action {
-        2 | 3 | 9 | 10 | 11 | 16 => 0,
-        6 | 7 | 13 | 18 => 1,
-        _ => 2,
-    }
-}
-
-/// Root steps run together in one `pkexec` (see `storage::run_root`).
-fn is_root_step(action: i32) -> bool {
-    matches!(action, 3 | 10 | 16)
-}
-
 fn main() {
     if std::env::args().skip(1).any(|a| a == "-V" || a == "--version") {
         return println!("fastcheckup {}", env!("CARGO_PKG_VERSION"));
     }
+    // Opens on System and skips the scans the other pages need until one of them is opened (shortcuts for system info).
+    let tab_system = std::env::args().skip(1).any(|a| a == "--tab-system");
+    let command = if tab_system { "system" } else { "show" };
     // Fixtures (scripts/ui-snapshot.sh) never touch a real running instance.
     let fixture_run = fixtures::mode().is_some();
     // One window: a copy is already open, so it comes to the front and this one leaves before setting anything up.
     // Before `host::run`, so a second Flatpak start does not spawn another host copy.
-    if !fixture_run && instance::send("show") {
+    if !fixture_run && instance::send(command) {
         return;
     }
     // In a Flatpak this relaunches the app on the host, where the scanners see the real system. It has to come before
@@ -99,10 +98,15 @@ fn main() {
     // Take the socket now that the window exists; a later start sends "show" and this window is raised.
     if !fixture_run {
         let weak = ui.as_weak();
-        let raise = move |_command: String| {
-            let _ = weak.upgrade_in_event_loop(|ui| instance::raise(ui.window()));
+        let raise = move |command: String| {
+            let _ = weak.upgrade_in_event_loop(move |ui| {
+                if command == "system" {
+                    ui.invoke_go(13);
+                }
+                instance::raise(ui.window());
+            });
         };
-        if instance::claim("show", raise) {
+        if instance::claim(command, raise) {
             return;
         }
     }
@@ -118,6 +122,7 @@ fn main() {
     ui.set_theme_index(theme_index(&settings.theme));
     OLD_DAYS.store(settings.usage_days, Relaxed);
     ui.set_old_days(settings.usage_days as i32);
+    ui.set_refresh_s(settings.refresh_s as i32);
     ALLOW_EMPTY_TRASH.store(settings.allow_empty_trash, Relaxed);
     SCANNED_EMPTY.store(settings.allow_empty_trash, Relaxed);
     ui.set_allow_empty_trash(settings.allow_empty_trash);
@@ -152,7 +157,9 @@ fn main() {
     let dirs = Rc::new(Dirs::from_env());
     // With fixtures (scripts/ui-snapshot.sh) nothing is scanned, so the real system is never read or changed.
     let fixture = fixtures::mode();
-    if fixture.is_none() {
+    // The scans a normal start runs before the first frame; with `--tab-system` the first other page opens runs them.
+    let eager = fixture.is_none() && !tab_system;
+    if eager {
         refresh(&ui, &dirs);
     }
 
@@ -212,13 +219,13 @@ fn main() {
         }
     });
 
-    if fixture.is_none() {
+    if eager {
         refresh_services(&ui);
     }
     let weak = ui.as_weak();
     ui.on_svc_rescan(move || refresh_services(&weak.unwrap()));
 
-    if fixture.is_none() {
+    if eager {
         refresh_boot(&ui);
     }
     let weak = ui.as_weak();
@@ -234,7 +241,9 @@ fn main() {
     if fixture.is_none() {
         let weak = ui.as_weak();
         ui.on_perf_rescan(move || refresh_perf(&weak.unwrap()));
-        refresh_perf(&ui);
+        if eager {
+            refresh_perf(&ui);
+        }
         let weak = ui.as_weak();
         ui.on_admin_run(move || run_admin(&weak.unwrap()));
         ui.set_is_root(admin::is_root());
@@ -248,6 +257,11 @@ fn main() {
     });
     let weak = ui.as_weak();
     ui.on_firewall_check(move || check_firewall(&weak.unwrap()));
+    let weak = ui.as_weak();
+    ui.on_lan_scan(move || lan_scan(&weak.unwrap()));
+    let weak = ui.as_weak();
+    ui.on_nmap_scan(move || nmap_scan(&weak.unwrap()));
+    ui.set_nmap_available(lan::nmap_installed());
     let weak = ui.as_weak();
     ui.on_smart_check(move |i, name| check_smart(&weak.unwrap(), i as usize, name.into()));
 
@@ -369,9 +383,19 @@ fn main() {
     });
 
     let months = settings.stale_months;
-    if fixture.is_none() {
+    if eager {
         refresh_apps(&ui, months);
     }
+    // `--tab-system` skipped the scans above; `go()` calls this on the first visit to any other page (Overview's own
+    // sample comes from `go(9)`).
+    let (weak, d) = (ui.as_weak(), dirs.clone());
+    ui.on_base_rescan(move || {
+        let ui = weak.unwrap();
+        refresh(&ui, &d);
+        refresh_services(&ui);
+        refresh_boot(&ui);
+        refresh_apps(&ui, months);
+    });
     let excluded = settings.excluded_paths.clone();
     let (weak, scan_excluded) = (ui.as_weak(), excluded.clone());
     ui.on_storage_rescan(move || refresh_storage(&weak.unwrap(), scan_excluded.clone()));
@@ -403,10 +427,74 @@ fn main() {
             let rows = bulk_rows(tier);
             let _ = weak.upgrade_in_event_loop(move |ui| {
                 ui.set_app_busy(false);
+                ui.set_bulk_title("".into());
                 ui.set_bulk_tier(tier);
                 ui.set_bulk(ModelRc::new(VecModel::from(rows)));
                 show_bulk(&ui);
                 ui.set_bulk_confirming(true);
+            });
+        });
+    });
+    // One list of Must analyze in the bulk dialog. The rows are the ones on the page, each re-checked by `run_action`.
+    let (weak, list_excluded) = (ui.as_weak(), excluded.clone());
+    ui.on_bulk_list(move |action, title, items| {
+        let ui = weak.unwrap();
+        if scan_is_stale() {
+            return refresh_storage(&ui, list_excluded.clone());
+        }
+        let rows: Vec<BulkRow> = items
+            .iter()
+            .filter(|l| l.keep == 0)
+            .map(|l| {
+                // A Steam leftover is acted on by its prefix folder; the others by the name shown.
+                let id = if action == 20 { l.path.clone() } else { l.id.clone() };
+                let cmd = app_plan(action, 1, &id, l.size_mb).map(|p| p.0).unwrap_or_default();
+                BulkRow {
+                    action,
+                    size_mb: l.size_mb,
+                    on: true,
+                    cmd: cmd.into(),
+                    detail: "".into(),
+                    name: l.id.clone(),
+                    id,
+                }
+            })
+            .collect();
+        ui.set_bulk_title(title);
+        ui.set_bulk_tier(2);
+        ui.set_bulk(ModelRc::new(VecModel::from(rows)));
+        show_bulk(&ui);
+        ui.set_bulk_confirming(true);
+    });
+    let (weak, look_excluded) = (ui.as_weak(), excluded.clone());
+    ui.on_look_find(move || {
+        let ui = weak.unwrap();
+        ui.set_look_busy(true);
+        STORE_STOP.store(false, Relaxed);
+        let (weak, excluded) = (weak.clone(), look_excluded.clone());
+        std::thread::spawn(move || {
+            let (folders, big, games) = storage::look(&apps::Dirs::from_env().home, &excluded, &STORE_STOP);
+            let rows = |items: Vec<storage::Item>| {
+                ModelRc::new(VecModel::from(
+                    items
+                        .into_iter()
+                        .map(|i| Left {
+                            size_mb: mb(i.size),
+                            last: date(i.newest).into(),
+                            id: i.id.into(),
+                            path: i.path.into(),
+                            keep: 0,
+                            used: "".into(),
+                        })
+                        .collect::<Vec<_>>(),
+                ))
+            };
+            let _ = weak.upgrade_in_event_loop(move |ui| {
+                ui.set_top_folders(rows(folders));
+                ui.set_big_files(rows(big));
+                ui.set_games(rows(games));
+                ui.set_look_scanned(true);
+                ui.set_look_busy(false);
             });
         });
     });
@@ -549,6 +637,10 @@ fn main() {
             fixtures::state(&ui, page, &state);
         }
     }
+    if tab_system {
+        ui.set_base_scanned(false);
+        ui.invoke_go(13);
+    }
     ui.run().unwrap();
 }
 
@@ -618,6 +710,21 @@ fn refresh_services(ui: &Main) {
                 secs: (s.secs * 10.0).round() / 10.0,
                 essential: s.essential,
                 background: s.background,
+                package: s.package.into(),
+                packaged: s.packaged,
+                delay: (s.delay * 10.0).round() / 10.0,
+                triggers: s.triggers.into(),
+                memory_mb: s.memory_mb,
+                cpu_secs: (s.cpu_secs * 10.0).round() / 10.0,
+                failed: s.failed,
+                restarts: s.restarts as i32,
+                doc_url: if s.doc.starts_with("http") {
+                    s.doc.clone().into()
+                } else {
+                    "".into()
+                },
+                man: s.doc.strip_prefix("man:").unwrap_or("").into(),
+                sysv: s.sysv,
             })
             .collect();
         let _ = weak.upgrade_in_event_loop(move |ui| {
@@ -659,169 +766,6 @@ fn drop_duplicate(ui: &Main, copy: &str) {
     }
 }
 
-/// One action of the Apps and Storage pages. `action`/`source` as in `main.slint`; shared by a single click and the bulk run.
-fn run_action(action: i32, source: i32, id: &str) -> std::io::Result<()> {
-    if matches!(action, 8 | 18) && !ALLOW_EMPTY_TRASH.load(Relaxed) {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::PermissionDenied,
-            "emptying the Trash is off in Preferences",
-        ));
-    }
-    let d = apps::Dirs::from_env();
-    match (action, source) {
-        (0, 0) => apps::uninstall_deb(id),
-        (0, 1) => apps::uninstall_flatpak(id),
-        (0, _) => apps::trash_appimage(&d, id),
-        (1, _) => apps::trash_leftover(&d, id),
-        (14, _) => apps::trash_stale_startup(id),
-        (15, _) => apps::trash_home_data(&d, id),
-        (2, _) => apps::remove_unused_flatpak(),
-        (3, _) => apps::autoremove(),
-        (5, _) => apps::remove_kernel(id),
-        (6, _) => storage::trash_build(&d.home, id),
-        (7, _) => storage::trash_installer(&d.home, id),
-        (8, _) => storage::empty_trash(),
-        (9, _) => storage::clear_cache(&d.home, id),
-        (10, _) => storage::vacuum_journal(),
-        (11 | 12, _) => storage::docker_prune(action == 12),
-        (13, _) => storage::trash_old_version(&d.home, id),
-        (16, _) => storage::apt_clean(),
-        (17, _) => id
-            .split_once('\n')
-            .map_or(Err(std::io::Error::other("bad duplicate id")), |(copy, orig)| {
-                storage::trash_duplicate(&d.home, copy, orig)
-            }),
-        (18, _) => storage::delete_trash_entry(&d.home, id, OLD_DAYS.load(Relaxed)),
-        _ => apps::purge_residual(),
-    }
-}
-
-/// The rows of the bulk dialog for a tier: what the last scan found plus the two checks that are cheap to repeat now.
-fn bulk_rows(tier_: i32) -> Vec<BulkRow> {
-    let mut found: Vec<(i32, String, u64)> = CANDIDATES
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .iter()
-        .filter(|c| tier(c.0) == tier_)
-        .cloned()
-        .collect();
-    // What the two removals of packages and runtimes will take, so the dialog can name them.
-    let (mut runtimes, mut packages, mut package_count) = (String::new(), String::new(), 0);
-    if tier_ == 0 {
-        if let Ok((list, freed)) = apps::unused_flatpak()
-            && !list.is_empty()
-        {
-            runtimes = list.join(", ");
-            found.push((2, "flatpak-unused".into(), freed));
-        }
-        let plan = apps::autoremove_plan();
-        if !plan.items.is_empty() {
-            (packages, package_count) = (plan.items.join(", "), plan.items.len());
-            found.push((3, "apt-autoremove".into(), plan.freed));
-        }
-    }
-    found
-        .into_iter()
-        .map(|(action, id, size)| {
-            let cmd = match action {
-                // The root steps share one line, added by `show_bulk`.
-                a if is_root_step(a) => String::new(),
-                2 => "flatpak uninstall --unused -y".into(),
-                _ => app_plan(action, 0, &id, mb(size)).map(|p| p.0).unwrap_or_default(),
-            };
-            BulkRow {
-                action,
-                size_mb: mb(size),
-                on: true,
-                cmd: cmd.into(),
-                detail: match action {
-                    2 => runtimes.clone(),
-                    3 => packages.clone(),
-                    _ => String::new(),
-                }
-                .into(),
-                name: if action == 3 {
-                    package_count.to_string()
-                } else {
-                    short_name(action, &id)
-                }
-                .into(),
-                id: id.into(),
-            }
-        })
-        .collect()
-}
-
-/// A build folder (6) is shown as `project/target`, a tool version (13) by its folder name; the full path is in the
-/// command line. Everything else is its own short id.
-fn short_name(action: i32, id: &str) -> String {
-    let keep = match action {
-        6 => 2,
-        13 => 1,
-        _ => return id.to_string(),
-    };
-    let mut parts: Vec<&str> = id.rsplit('/').filter(|p| !p.is_empty()).take(keep).collect();
-    parts.reverse();
-    parts.join("/")
-}
-
-/// Totals and the command lines of the ticked rows. The root line is built by the function that runs it.
-fn show_bulk(ui: &Main) {
-    let on: Vec<BulkRow> = ui.get_bulk().iter().filter(|r| r.on).collect();
-    let root: Vec<i32> = on.iter().map(|r| r.action).filter(|a| is_root_step(*a)).collect();
-    let mut lines: Vec<String> = on.iter().map(|r| r.cmd.to_string()).filter(|c| !c.is_empty()).collect();
-    if !root.is_empty() {
-        lines.push(storage::root_command(&root));
-    }
-    ui.set_bulk_cmds(lines.join("\n").into());
-    let tr = ui.global::<Tr>();
-    let detail: Vec<String> = on
-        .iter()
-        .filter(|r| !r.detail.is_empty())
-        .map(|r| match r.action {
-            2 => tr.invoke_runtimes(r.detail.clone()),
-            _ => tr.invoke_also_removed(r.detail.clone()),
-        })
-        .map(|s| s.to_string())
-        .collect();
-    ui.set_bulk_detail(detail.join("\n").into());
-    ui.set_bulk_mb(on.iter().map(|r| r.size_mb).sum());
-    ui.set_bulk_count(on.len() as i32);
-    ui.set_bulk_root(!root.is_empty());
-    ui.set_bulk_flatpak(on.iter().any(|r| r.action == 2));
-}
-
-/// Runs the ticked rows: the user-level ones one by one, then every root step in one `pkexec`. A failure does not stop
-/// the rest. Returns the errors, one per line, empty when all worked.
-fn run_bulk(rows: &[BulkRow]) -> String {
-    let done = |id: &str| history::append(&Record::now(Kind::Removed, id, id));
-    let mut errors = Vec::new();
-    for r in rows.iter().filter(|r| !is_root_step(r.action)) {
-        match run_action(r.action, 0, &r.id) {
-            Ok(()) => done(&r.id),
-            Err(e) => errors.push(format!("{}: {e}", r.id)),
-        }
-    }
-    let mut root: Vec<i32> = rows.iter().map(|r| r.action).filter(|a| is_root_step(*a)).collect();
-    // The dialog may have been open a while: autoremove never runs on a list that is empty now.
-    if root.contains(&3) && apps::autoremove_plan().items.is_empty() {
-        root.retain(|a| *a != 3);
-    }
-    if !root.is_empty() {
-        for (action, result) in storage::run_root(&root) {
-            let id = rows
-                .iter()
-                .find(|r| r.action == action)
-                .map_or(String::new(), |r| r.id.to_string());
-            match result {
-                Ok(()) => done(&id),
-                Err(e) => errors.push(format!("{id}: {e}")),
-            }
-        }
-    }
-    errors.join("\n")
-}
-
 fn refresh_storage(ui: &Main, excluded: Vec<String>) {
     ui.set_store_busy(true);
     STORE_STOP.store(false, Relaxed);
@@ -838,8 +782,18 @@ fn refresh_storage(ui: &Main, excluded: Vec<String>) {
             .builds
             .into_iter()
             .partition(|b| b.newest.is_some_and(|n| n <= cutoff));
+        // Same split for Cargo's folders: only unused ones are bulk candidates, because a clean-up of a folder you
+        // build with every day just fills it again.
+        let (old_cargo, cargo): (Vec<_>, Vec<_>) = scan
+            .cargo
+            .into_iter()
+            .partition(|b| b.newest.is_some_and(|n| n <= cutoff));
         let mut found: Vec<(i32, String, u64)> = Vec::new();
+        found.extend(old_cargo.iter().map(|i| (25, i.id.clone(), i.size)));
         found.extend(scan.caches.iter().map(|i| (9, i.id.clone(), i.size)));
+        found.extend(scan.pycaches.iter().map(|i| (21, i.id.clone(), i.size)));
+        found.extend(scan.browsers.iter().map(|i| (23, i.id.clone(), i.size)));
+        found.extend(scan.flatpak_caches.iter().map(|i| (26, i.id.clone(), i.size)));
         found.extend(old_builds.iter().map(|i| (6, i.id.clone(), i.size)));
         found.extend(scan.installers.iter().map(|i| (7, i.id.clone(), i.size)));
         if allow_empty {
@@ -857,6 +811,12 @@ fn refresh_storage(ui: &Main, excluded: Vec<String>) {
         }
         if scan.apt_cache > 1_000_000 {
             found.push((16, "apt-cache".into(), scan.apt_cache));
+        }
+        if scan.coredumps.count > 0 {
+            found.push((22, "coredumps".into(), scan.coredumps.size));
+        }
+        if scan.rotated_logs.1 > 0 {
+            found.push((24, "rotated-logs".into(), scan.rotated_logs.0));
         }
         if let Some(r) = scan.docker.iter().find(|r| r.kind == "Build Cache")
             && r.reclaimable_bytes > 0
@@ -912,30 +872,31 @@ fn refresh_storage(ui: &Main, excluded: Vec<String>) {
             .collect();
         let _ = weak.upgrade_in_event_loop(move |ui| {
             ui.set_mounts(ModelRc::new(VecModel::from(mounts)));
-            ui.set_top_folders(rows(scan.folders));
-            ui.set_big_files(rows(scan.big_files));
-            ui.set_games(rows(scan.games));
+            ui.set_steam_leftovers(rows(scan.steam_leftovers));
             ui.set_old_versions(ModelRc::new(VecModel::from(versions)));
             ui.set_builds(rows(builds));
             ui.set_old_builds(rows(old_builds));
+            ui.set_old_cargo(rows(old_cargo));
+            ui.set_cargo(rows(cargo));
             ui.set_old_trash(rows(scan.old_trash));
             ui.set_safe_scan_mb(safe_mb);
             ui.set_almost_free_mb(almost_mb);
             ui.set_installers(rows(scan.installers));
             ui.set_caches(rows(scan.caches));
+            ui.set_pycaches(rows(scan.pycaches));
+            ui.set_browsers(rows(scan.browsers));
+            ui.set_flatpak_caches(rows(scan.flatpak_caches));
             ui.set_docker(ModelRc::new(VecModel::from(docker)));
             ui.set_trash_count(scan.trash_count as i32);
             ui.set_trash_mb(mb(scan.trash_size));
             ui.set_journal_mb(mb(scan.journal));
             ui.set_apt_mb(mb(scan.apt_cache));
-            ui.set_snap_count(scan.snapshots.len() as i32);
-            ui.set_snap_oldest(
-                scan.snapshots
-                    .first()
-                    .map(|s| s.split('_').next().unwrap_or(s).to_string())
-                    .unwrap_or_default()
-                    .into(),
-            );
+            ui.set_coredump_mb(mb(scan.coredumps.size));
+            ui.set_coredump_count(scan.coredumps.count as i32);
+            ui.set_coredump_app(scan.coredumps.top.into());
+            ui.set_rotated_log_mb(mb(scan.rotated_logs.0));
+            ui.set_rotated_log_count(scan.rotated_logs.1 as i32);
+            set_snaps(&ui, &scan.snapshots);
             ui.set_snap_set_up(scan.timeshift);
             apply_admin(&ui);
             set_totals(&ui);
@@ -1078,10 +1039,16 @@ fn app_plan(action: i32, source: i32, id: &str, size_mb: f32) -> std::io::Result
     Ok(match (action, source) {
         (0, 0) => {
             let plan = apps::precheck_deb(id)?;
+            removal_shown(&plan.removes);
             let also = plan.removes.into_iter().filter(|r| r != id).collect();
             (format!("pkexec apt-get remove -y {id}"), plan.freed as f64, also)
         }
         (0, 1) => (format!("flatpak uninstall -y {id}"), size, vec![]),
+        (0, 3) => {
+            return Err(std::io::Error::other(
+                "not installed from a package, use its own uninstaller",
+            ));
+        }
         (0, _) => (format!("gio trash -- {}", d.appimages.join(id).display()), size, vec![]),
         (1, _) => (
             format!("gio trash -- {}", d.home.join(".var/app").join(id).display()),
@@ -1110,6 +1077,7 @@ fn app_plan(action: i32, source: i32, id: &str, size_mb: f32) -> std::io::Result
         }
         (3, _) => {
             let list = apps::autoremove_plan();
+            removal_shown(&list.items);
             ("pkexec apt-get autoremove -y".into(), list.freed as f64, list.items)
         }
         (6 | 13, _) => (format!("gio trash -- {id}"), size, vec![]),
@@ -1119,7 +1087,41 @@ fn app_plan(action: i32, source: i32, id: &str, size_mb: f32) -> std::io::Result
             vec![],
         ),
         (18, _) => (storage::trash_entry_command(&d.home, id), size, vec![]),
+        (20, _) => {
+            let paths = storage::steam_leftover_paths(id);
+            if paths.is_empty() {
+                return Err(std::io::Error::other("not a Steam leftover any more, scan again"));
+            }
+            let list: Vec<String> = paths.iter().map(|p| p.display().to_string()).collect();
+            (format!("gio trash -- {}", list.join(" ")), size, vec![])
+        }
+        (19, _) => (
+            format!("pkexec timeshift --delete --snapshot {id} --scripted"),
+            0.0,
+            vec![],
+        ),
         (8, _) => ("gio trash --empty".into(), size, vec![]),
+        (21, _) => (format!("rm -r {id}/**/__pycache__"), size, vec![]),
+        (23, _) => {
+            let list: Vec<String> = storage::browsers::paths(&d.home, id)
+                .iter()
+                .map(|p| format!("'{}'", p.display()))
+                .collect();
+            (format!("rm -r {}", list.join(" ")), size, vec![])
+        }
+        (26, _) => {
+            let dirs = storage::flatpak::path(&d.home, id);
+            if dirs.is_empty() {
+                return Err(std::io::Error::other("unknown Flatpak app, scan again"));
+            }
+            let list: Vec<String> = dirs.iter().map(|p| format!("'{}'/*", p.display())).collect();
+            (format!("rm -r {}", list.join(" ")), size, vec![])
+        }
+        (25, _) => {
+            let dir = storage::cargo::path(&d.home, id)
+                .ok_or_else(|| std::io::Error::other("unknown Cargo folder, scan again"))?;
+            (format!("rm -r '{}'/*", dir.display()), size, vec![])
+        }
         (9, _) => (
             format!("rm -r {}", d.home.join(".cache").join(id).display()),
             size,
@@ -1140,6 +1142,12 @@ fn app_plan(action: i32, source: i32, id: &str, size_mb: f32) -> std::io::Result
         }
         (12, _) => ("docker system prune -f".into(), 0.0, vec![]),
         (16, _) => ("pkexec apt-get clean".into(), storage::apt_cache_bytes() as f64, vec![]),
+        (22, _) => (storage::root_command(&[22]), storage::coredump_bytes() as f64, vec![]),
+        (24, _) => (
+            storage::root_command(&[24]),
+            storage::rotated_log_bytes() as f64,
+            vec![],
+        ),
         // The id is "copy\noriginal"; the dialog shows the copy only.
         (17, _) => (
             format!("gio trash -- {}", id.split('\n').next().unwrap_or_default()),
@@ -1148,6 +1156,7 @@ fn app_plan(action: i32, source: i32, id: &str, size_mb: f32) -> std::io::Result
         ),
         (5, _) => {
             let (kernel, plan) = apps::kernel_plan(id)?;
+            removal_shown(&plan.removes);
             let also = plan
                 .removes
                 .into_iter()
@@ -1191,6 +1200,17 @@ fn set_disk(ui: &Main, i: usize, f: impl FnOnce(&mut Disk)) {
         f(&mut d);
         m.set_row_data(i, d);
     }
+    // Mirrors `disk-level == 3` in main.slint, so the Overview card agrees with the page.
+    let failing = ui.get_disks().iter().any(|d| {
+        d.state == 2
+            || (d.state == 1
+                && if d.nvme {
+                    d.uncorrectable > 0 || d.used >= 95 || (d.spare >= 0 && d.spare <= 5)
+                } else {
+                    d.pending + d.uncorrectable > 0
+                })
+    });
+    ui.set_smart_failing(failing);
 }
 
 /// SMART goes through `pkexec`, so it runs on a thread while the password dialog is open.
@@ -1243,6 +1263,22 @@ fn run_admin(ui: &Main) {
     });
 }
 
+/// The Timeshift card: count, oldest date and one row per snapshot (names are oldest first).
+fn set_snaps(ui: &Main, names: &[String]) {
+    let keep = storage::snapshot_keep(names, apps::now());
+    ui.set_snap_count(names.len() as i32);
+    ui.set_snap_oldest(names.first().map_or("", |s| s.split('_').next().unwrap_or(s)).into());
+    let rows: Vec<Snap> = names
+        .iter()
+        .zip(keep)
+        .map(|(n, keep)| Snap {
+            name: n.as_str().into(),
+            keep,
+        })
+        .collect();
+    ui.set_snaps(ModelRc::new(VecModel::from(rows)));
+}
+
 /// Puts the kept root data (firewall, SMART, Timeshift) on the pages. Called after an admin run and after the scans
 /// that would overwrite it.
 fn apply_admin(ui: &Main) {
@@ -1257,9 +1293,8 @@ fn apply_admin(ui: &Main) {
             set_disk(ui, i, |d| apply_smart(d, &health::parse_smart(text)));
         }
     }
-    if let (Some(oldest), Some(newest)) = (a.snapshots.first(), a.snapshots.last()) {
-        ui.set_snap_count(a.snapshots.len() as i32);
-        ui.set_snap_oldest(oldest.split('_').next().unwrap_or(oldest).into());
+    if let Some(newest) = a.snapshots.last() {
+        set_snaps(ui, &a.snapshots);
         ui.set_snap_set_up(true);
         ui.set_backup_state(2);
         ui.set_backup_latest(newest.as_str().into());
@@ -1586,6 +1621,9 @@ fn refresh_health(ui: &Main) {
                 .to_string()
             };
             let mut other: Vec<String> = h.errors.iter().map(err_line).collect();
+            if h.log_unread {
+                other.push(tr.invoke_log_unread_line().to_string());
+            }
             other.extend(
                 h.failed_mounts
                     .iter()
@@ -1627,26 +1665,29 @@ fn refresh_health(ui: &Main) {
 /// out-of-memory kill on record; `crashed` is any unclean shutdown in `last -x`, which may have another cause.
 pub fn show_memory(ui: &Main, m: &health::Memory, crashed: bool) {
     let tr = ui.global::<Tr>();
-    let line = |code: i32, a: &str| tr.invoke_memory_line(code, a.into()).to_string();
-    let mut lines = vec![
-        match m.swap.is_empty() {
-            true => line(1, ""),
-            false => line(0, &m.swap.join(", ")),
-        },
-        match m.watcher.is_empty() {
-            true => line(3, ""),
-            false => line(2, &m.watcher),
-        },
-    ];
+    let line = |code: i32, a: &str, b: &str| tr.invoke_memory_line(code, a.into(), b.into()).to_string();
+    let swap = match m.swap.is_empty() {
+        true => line(1, "", ""),
+        false => line(0, &m.swap.join(", "), ""),
+    };
+    let swap = if m.zram_small() {
+        let (mb, gb) = ((m.zram_kb + 512) / 1024, (m.ram_kb as f64 / 1_048_576.0).round());
+        format!("{swap}\n{}", line(5, &mb.to_string(), &gb.to_string()))
+    } else {
+        swap
+    };
+    let mut watcher = vec![match m.watcher.is_empty() {
+        true => line(3, "", ""),
+        false => line(2, &m.watcher, ""),
+    }];
     if m.oom_kills > 0 {
-        lines.push(line(4, &m.oom_kills.to_string()));
+        watcher.push(line(4, &m.oom_kills.to_string(), ""));
     }
-    let warning = m.unprotected() && (crashed || m.oom_kills > 0);
-    if m.unprotected() {
-        lines.push(line(5, "sudo apt install earlyoom"));
-    }
-    ui.set_mem_text(lines.join("\n").into());
-    ui.set_mem_warning(warning);
+    // The commands themselves are literals in main.slint (never translated, the user pastes them).
+    ui.set_zram_small(m.zram_small());
+    ui.set_swap_text(swap.into());
+    ui.set_watcher_text(watcher.join("\n").into());
+    ui.set_mem_warning(m.unprotected() && (crashed || m.oom_kills > 0));
 }
 
 // pkexec blocks until the password dialog is answered, so it runs on a worker.
@@ -1662,6 +1703,63 @@ fn check_firewall(ui: &Main) {
     });
 }
 
+// Both scans only start from their buttons. The built-in one takes a few seconds, so it runs on a worker.
+fn lan_scan(ui: &Main) {
+    run_lan_scan(ui, || Ok(lan::scan()));
+}
+
+// nmap fills the same table with more ports; its failure text goes to `nmap-error`.
+fn nmap_scan(ui: &Main) {
+    run_lan_scan(ui, lan::scan_nmap);
+}
+
+fn run_lan_scan(ui: &Main, scan: impl FnOnce() -> std::io::Result<Option<Vec<lan::Host>>> + Send + 'static) {
+    ui.set_lan_state(1);
+    ui.set_nmap_error("".into());
+    let weak = ui.as_weak();
+    std::thread::spawn(move || {
+        let r = scan();
+        let _ = weak.upgrade_in_event_loop(move |ui| {
+            let (state, hosts) = match r {
+                Ok(Some(h)) => (2, h),
+                Ok(None) => (3, Vec::new()),
+                Err(e) => {
+                    ui.set_nmap_error(e.to_string().into());
+                    (4, Vec::new())
+                }
+            };
+            ui.set_lan_state(state);
+            let rows: Vec<LanHost> = hosts
+                .into_iter()
+                .map(|h| LanHost {
+                    ip: h.ip.to_string().into(),
+                    mac: h.mac.into(),
+                    name: h.name.into(),
+                    vendor: h.vendor.into(),
+                    model: h.model.into(),
+                    kind: h.kind,
+                    shared: h.shared as i32,
+                    ports: ports_text(&h.ports, false).into(),
+                    risky_ports: ports_text(&h.ports, true).into(),
+                    risky: h.ports.iter().any(|(p, _)| lan::risky(*p)),
+                })
+                .collect();
+            ui.set_lan_risky(rows.iter().filter(|r| r.risky).count() as i32);
+            ui.set_lan_hosts(ModelRc::new(VecModel::from(rows)));
+        });
+    });
+}
+
+/// "23 telnet, 445 smb": the risky ports (`risky` true) or the others, joined for one wrapping text.
+fn ports_text(ports: &[(u16, String)], risky: bool) -> String {
+    ports
+        .iter()
+        .filter(|(p, _)| lan::risky(*p) == risky)
+        .map(lan::port_label)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// The figures the dashboards show, read back from the lists the scans filled. The sizes of the Safe and Almost safe
 /// tiers are not here: they come from the same list as the bulk dialog (`CANDIDATES`, see `refresh_storage`), so the
 /// tile and the dialog agree.
@@ -1674,10 +1772,10 @@ pub fn set_totals(ui: &Main) {
 /// 0 network, 1 programs running, 2 starts by itself, 3 accounts, 4 browser add-ons, 5 updates.
 fn finding_group(code: i32) -> i32 {
     match code {
-        0 | 1 | 10 => 0,
+        0 | 1 | 10 | 15..=22 | 25..=30 => 0,
         2 | 3 => 1,
         4 | 5 | 7 => 2,
-        6 | 9 => 3,
+        6 | 9 | 23 | 24 => 3,
         11..=14 => 5,
         _ => 4,
     }
@@ -1694,7 +1792,12 @@ fn set_findings(ui: &Main, mut findings: Vec<Finding>) {
     ui.set_sec_info(count(0));
     // The dashboard shows the worst three whatever their topic.
     ui.set_top_findings(ModelRc::new(VecModel::from(
-        findings.iter().take(3).cloned().collect::<Vec<_>>(),
+        findings
+            .iter()
+            .filter(|f| f.level >= 0)
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>(),
     )));
     // The page groups by topic: the topic with the worst finding first, worst first inside it. The sort is stable.
     let worst = |g: i32| findings.iter().filter(|f| f.group == g).map(|f| f.level).max();
@@ -1736,12 +1839,20 @@ fn set_findings(ui: &Main, mut findings: Vec<Finding>) {
         .filter(|&g| g == 0 || !per_group[g as usize].is_empty())
         .collect();
     ui.set_shown_groups(ModelRc::new(VecModel::from(shown)));
+    // Level -1 is "checked, fine": listed on the page but not counted as a finding.
+    ui.set_group_counts(ModelRc::new(VecModel::from(
+        per_group
+            .iter()
+            .map(|v| v.iter().filter(|f| f.level >= 0).count() as i32)
+            .collect::<Vec<_>>(),
+    )));
     ui.set_group_findings(ModelRc::new(VecModel::from(
         per_group
             .into_iter()
             .map(|v| ModelRc::new(VecModel::from(v)))
             .collect::<Vec<_>>(),
     )));
+    findings.retain(|f| f.level >= 0);
     ui.set_findings(ModelRc::new(VecModel::from(findings)));
 }
 
@@ -1948,27 +2059,30 @@ fn icon_path(name: &str) -> Option<std::path::PathBuf> {
             .flat_map(|d| d.flatten().map(|e| e.path()))
             .collect();
         // read_dir order is arbitrary; sort so the same icon is picked every run, hicolor (the standard fallback) first.
-        themes.sort_by_key(|t| (!t.ends_with("hicolor"), t.clone()));
-        // Theme layouts differ (`48x48/apps`, `48/apps`, `apps/48`, `scalable/apps`); `status` and `devices` hold tray and hardware icons.
+        // HighContrast goes last: its black-and-white icons would beat the coloured ones of Yaru, Mint and the rest.
+        themes.sort_by_key(|t| (!t.ends_with("hicolor"), t.ends_with("HighContrast"), t.clone()));
+        // Theme layouts differ (`48x48/apps`, `48/apps`, `apps/48`, `scalable/apps`); `status` and `devices` hold tray and hardware icons, `categories` the Mint settings panels (cs-color), `stock` the old GTK names.
         let sizes = ["48", "32", "64", "24", "22", "16", "128", "256"];
         // PNG before SVG: it decodes cheaper. shortcut: first theme with a match wins, not the active one.
         ["png", "svg"]
             .iter()
             .flat_map(|ext| {
                 themes.iter().flat_map(move |t| {
-                    ["apps", "status", "devices"].into_iter().flat_map(move |ctx| {
-                        let scalable = t.join(format!("scalable/{ctx}/{name}.{ext}"));
-                        sizes
-                            .into_iter()
-                            .flat_map(move |s| {
-                                [
-                                    t.join(format!("{s}x{s}/{ctx}/{name}.{ext}")),
-                                    t.join(format!("{s}/{ctx}/{name}.{ext}")),
-                                    t.join(format!("{ctx}/{s}/{name}.{ext}")),
-                                ]
-                            })
-                            .chain([scalable])
-                    })
+                    ["apps", "categories", "status", "devices", "stock"]
+                        .into_iter()
+                        .flat_map(move |ctx| {
+                            let scalable = t.join(format!("scalable/{ctx}/{name}.{ext}"));
+                            sizes
+                                .into_iter()
+                                .flat_map(move |s| {
+                                    [
+                                        t.join(format!("{s}x{s}/{ctx}/{name}.{ext}")),
+                                        t.join(format!("{s}/{ctx}/{name}.{ext}")),
+                                        t.join(format!("{ctx}/{s}/{name}.{ext}")),
+                                    ]
+                                })
+                                .chain([scalable])
+                        })
                 })
             })
             .chain(["png", "svg"].map(|ext| format!("/usr/share/pixmaps/{name}.{ext}").into()))
@@ -1999,18 +2113,7 @@ fn language(settings: &Settings) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{THEMES, short_name, theme_index, tier};
-
-    #[test]
-    fn bulk_names_are_short_and_every_bulk_action_has_a_tier() {
-        assert_eq!(short_name(6, "/home/u/dev/app/target"), "app/target");
-        assert_eq!(short_name(13, "/home/u/.steam/tools/GE-Proton8-1/"), "GE-Proton8-1");
-        assert_eq!(short_name(9, "mozilla"), "mozilla");
-        // 8 (empty the whole Trash), 12 (Docker prune) and the per-item pages are never offered in bulk.
-        assert!([2, 3, 9, 10, 11, 16].iter().all(|a| tier(*a) == 0));
-        assert!([6, 7, 13, 18].iter().all(|a| tier(*a) == 1));
-        assert!([0, 1, 5, 8, 12, 14, 15, 17].iter().all(|a| tier(*a) == 2));
-    }
+    use super::{THEMES, theme_index};
 
     #[test]
     fn themes_and_their_indexes_agree() {

@@ -22,10 +22,10 @@ jobs:
   bundle:
     name: Build bundle
     runs-on: ubuntu-24.04
-    # Flathub's CI image: the Freedesktop SDK 25.08 is preinstalled, so each run skips a ~1 GB download.
+    # Flathub's CI image: the Freedesktop SDK 26.08 is preinstalled, so each run skips a ~1 GB download.
     # The tag must match runtime-version in flatpak/io.github.evandro777.FastCheckup.yml and the rust-stable lines below.
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08
       options: --privileged
     env:
       FLATPAK_INSTALLATION: --system
@@ -44,8 +44,8 @@ jobs:
       # Its cargo also runs in the container (same SDK) and is used by build.sh to vendor the crates.
       - name: Rust SDK extension
         run: |
-          flatpak install --system -y flathub org.freedesktop.Sdk.Extension.rust-stable//25.08
-          echo /var/lib/flatpak/runtime/org.freedesktop.Sdk.Extension.rust-stable/x86_64/25.08/active/files/bin >> "$GITHUB_PATH"
+          flatpak install --system -y flathub org.freedesktop.Sdk.Extension.rust-stable//26.08
+          echo /var/lib/flatpak/runtime/org.freedesktop.Sdk.Extension.rust-stable/x86_64/26.08/active/files/bin >> "$GITHUB_PATH"
 
       # Secrets are not available to PRs, so only tags sign. Without the key a tag build would publish an unsigned
       # remote that system-wide installs refuse, so it stops here instead.

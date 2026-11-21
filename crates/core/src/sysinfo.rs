@@ -1,12 +1,11 @@
 //! System page data: machine, firmware, CPU, memory, GPUs, hardware acceleration and connected devices. Report only,
 //! no root. Parsers take text so tests run on canned output; `scan` reads `root` (`/` for real) and runs the tools.
 use std::fs;
-use std::io::Read;
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::process::Command;
+use std::time::Duration;
 
-use crate::{health, perf};
+use crate::{health, perf, services::output_within};
 
 /// Result of one acceleration check.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -118,35 +117,12 @@ fn in_path(program: &str) -> bool {
 /// `None` when the program is not installed; otherwise `(exit ok, stdout)`. `LC_ALL=C` so the labels we parse are English.
 /// Killed after 5 s: a broken GPU driver can make `vulkaninfo` or `vainfo` hang, and the page would stay busy forever.
 fn cmd(program: &str, args: &[&str]) -> Option<(bool, String)> {
-    let mut child = Command::new(program)
-        .args(args)
-        .env("LC_ALL", "C")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let mut stdout = child.stdout.take()?;
-    // Drained on its own thread so a full pipe cannot block the child.
-    let reader = std::thread::spawn(move || {
-        let mut buf = Vec::new();
-        let _ = stdout.read_to_end(&mut buf);
-        buf
-    });
-    let deadline = Instant::now() + Duration::from_secs(5);
-    let ok = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status.success(),
-            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                break false;
-            }
-        }
-    };
-    let bytes = reader.join().unwrap_or_default();
-    Some((ok, String::from_utf8_lossy(&bytes).into_owned()))
+    let out = output_within(
+        Command::new(program).args(args).env("LC_ALL", "C"),
+        Duration::from_secs(5),
+    )
+    .ok()?;
+    Some((out.status.success(), String::from_utf8_lossy(&out.stdout).into_owned()))
 }
 
 fn read(root: &Path, rel: &str) -> String {

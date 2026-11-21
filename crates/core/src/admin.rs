@@ -17,6 +17,8 @@ echo "@@$n ufw"; /usr/sbin/ufw status verbose
 done
 echo "@@$n snapshots"
 for d in /timeshift/snapshots /timeshift-btrfs/snapshots /run/timeshift/backup/timeshift/snapshots /run/timeshift/backup/timeshift-btrfs/snapshots; do /usr/bin/ls -1 "$d"; done
+# Btrfs mode: the snapshots sit in a top-level subvolume that is not mounted, but root can list it.
+/usr/bin/btrfs subvolume list / 2>/dev/null | /usr/bin/sed -n 's|.* path @\{0,1\}timeshift-btrfs/snapshots/\([^/]*\)/.*|\1|p'
 "#;
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -67,6 +69,8 @@ pub fn parse(text: &str, nonce: &str) -> io::Result<Admin> {
             ("snapshots", _) => {
                 a.snapshots = text.lines().filter(|n| plain(n)).map(String::from).collect();
                 a.snapshots.sort();
+                // Btrfs lists a snapshot once per subvolume (`@`, `@home`).
+                a.snapshots.dedup();
             }
             _ => {}
         }
@@ -115,7 +119,7 @@ mod tests {
     fn sections_are_split_and_forged_markers_ignored() {
         let t = "@@abc ufw\nStatus: inactive\n@@abc procs\n1 /usr/lib/systemd/systemd\n7 /tmp/x\n@@evil ufw\nStatus: active\n\
                  @@abc smart sda\nSMART overall-health: PASSED\n@@abc smart ../x\nbad\n@@abc smart sdb\n\n\
-                 @@abc snapshots\n2024-01-01_10-00-00\n";
+                 @@abc snapshots\n2024-01-01_10-00-00\n2024-01-01_10-00-00\n";
         let a = parse(t, "abc").unwrap();
         // The forged marker is plain text inside the procs section, so it opens no section and drops out as a non-pid line.
         assert_eq!(a.ufw, "Status: inactive");

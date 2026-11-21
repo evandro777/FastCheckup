@@ -5,9 +5,11 @@
 # STATE=expanded opens every disk's partitions (disk-health), or the swap/zram card (speed).
 # Space (page 10; `leftovers` and `storage` are aliases of it) shows the disks and the clean-up tabs.
 # STATE=group1|group2|group3 shows the Almost safe, Must analyze or Look only tab of Space (none = Safe).
-# STATE=bulk0|bulk1 opens the bulk clean-up dialog of the Safe or Almost safe tab.
+# STATE=dumps scrolls the Safe tab of Space to the crash dumps card; dumpconfirm opens its confirm dialog.
+# STATE=bulk0|bulk1 opens the bulk clean-up dialog of the Safe or Almost safe tab; bulk2 the review of one Must analyze list.
 # STATE=bottom scrolls the Disk health (7) or System (13) page to its end.
 # STATE=menu|about opens the sidebar menu or the About dialog on any page.
+# STATE=busy shows the scanning look (placeholder tiles, "Working...", progress bar) on Overview, Space, Safety, Disk health, Security or Speed.
 # STATE=sandboxed shows the "cannot reach the host" notice (Overview, page 9).
 # STATE=admin-error shows the failed admin run on the Overview (the admin notice itself is always shown there).
 # STATE=expanded|confirm opens a row or a confirm dialog (startup, services, apps; boot has confirm) -> <page>-<mode>-<state>.png.
@@ -22,7 +24,7 @@ mkdir -p "$OUT"
 # Read by the app; unset (and so ignored) when STATE is empty.
 [ -n "${STATE:-}" ] && export FASTCHECKUP_STATE=$STATE
 
-cargo build --quiet
+cargo build --quiet -p fastcheckup --features fixtures
 
 Xvfb "$DISPLAY_NUM" -screen 0 1280x800x24 >/dev/null 2>&1 &
 XVFB=$!

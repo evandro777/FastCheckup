@@ -2,7 +2,7 @@
 //! zero, one or many rows without scanning or touching the real system.
 use slint::{Model, ModelRc, SharedString, VecModel};
 
-use crate::*;
+use crate::{bulk::short_name, *};
 
 /// 0 empty, 1 single, 2 many; `None` when the variable is unset or unknown.
 pub fn mode() -> Option<usize> {
@@ -77,10 +77,37 @@ pub fn apply(ui: &Main, m: usize) {
         unit: format!("example-{i}.service").into(),
         description: "A background program that takes a while to start".into(),
         enabled: i % 2 == 0,
-        active: i % 3 != 0,
+        active: i % 3 != 0 || i == 0,
         secs: 0.5 * (i + 1) as f32,
         essential: i == 1,
         background: i % 4 == 0,
+        package: if i % 3 == 1 {
+            format!("example-{i}-daemon").into()
+        } else {
+            "".into()
+        },
+        packaged: true,
+        delay: if i == 0 { 122.3 } else { 0.0 },
+        triggers: if i == 0 {
+            "example-2.socket example-2.path".into()
+        } else {
+            "".into()
+        },
+        memory_mb: 3.0 + 40.0 * i as f32,
+        cpu_secs: 1.5 * i as f32,
+        failed: i == 0,
+        restarts: if i == 0 { 3 } else { 0 },
+        doc_url: if i == 0 {
+            "https://example.com/docs".into()
+        } else {
+            "".into()
+        },
+        man: if i == 1 {
+            format!("example-{i}(8)").into()
+        } else {
+            "".into()
+        },
+        sysv: i == 0,
     }));
 
     // Overview "Right now": empty = not sampled yet, single = fine with one app, many = short of memory.
@@ -136,7 +163,7 @@ pub fn apply(ui: &Main, m: usize) {
     ui.set_apps(model(m, |i| AppRow {
         id: format!("app-{i}").into(),
         name: format!("Example application {i}").into(),
-        source: (i % 3) as i32,
+        source: (i % 4) as i32,
         size_mb: 120.0 * (i + 1) as f32,
         manual: i % 2 == 0,
         essential: i == 1,
@@ -195,6 +222,12 @@ pub fn apply(ui: &Main, m: usize) {
     ui.set_top_folders(model(m, |i| left(i, "folder")));
     ui.set_big_files(model(m, |i| left(i, "big-file.iso")));
     ui.set_games(model(m, |i| left(i, "game")));
+    // `empty` shows Look only before anyone pressed Analyze.
+    ui.set_look_scanned(m != 0);
+    ui.set_steam_leftovers(model(m, |i| Left {
+        id: format!("#{}", 1_129_120 + i).into(),
+        ..left(i, "steamapps/compatdata")
+    }));
     ui.set_old_versions(model(m, |i| Left {
         keep: i as i32 % 5,
         used: if i % 5 == 2 {
@@ -206,12 +239,19 @@ pub fn apply(ui: &Main, m: usize) {
     }));
     ui.set_builds(model(m, |i| left(i, "recent/target")));
     ui.set_old_builds(model(m, |i| left(i, "project/target")));
+    ui.set_cargo(model(m, |i| left(i, ["registry-src", "registry-cache", "git"][i % 3])));
+    ui.set_old_cargo(model(m, |i| left(i, ["registry-src", "registry-cache", "git"][i % 3])));
+    ui.set_flatpak_caches(model(m, |i| {
+        left(i, ["org.mozilla.firefox", "com.github.tchx84.Flatseal"][i % 2])
+    }));
     ui.set_old_trash(model(m, |i| Left {
         last: "2026-01-05".into(),
         ..left(i, "deleted-folder")
     }));
     ui.set_installers(model(m, |i| left(i, "installer.deb")));
     ui.set_caches(model(m, |i| left(i, "cache")));
+    ui.set_pycaches(model(m, |i| left(i, "~/code/project")));
+    ui.set_browsers(model(m, |i| left(i, ["google-chrome", "firefox", "chromium"][i % 3])));
     ui.set_docker(fixed(if m == 0 { 0 } else { 2 }, |i| Dock {
         kind: ["Images", "Containers"][i].into(),
         size: "1.2GB".into(),
@@ -221,11 +261,21 @@ pub fn apply(ui: &Main, m: usize) {
     ui.set_trash_mb([0.0, 2.0, 640.0][m]);
     ui.set_journal_mb([0.0, 4.0, 512.0][m]);
     ui.set_apt_mb([0.0, 0.5, 840.0][m]);
+    ui.set_coredump_mb([0.0, 58.6, 1850.0][m]);
+    ui.set_coredump_count([0, 1, 22][m]);
+    ui.set_coredump_app(if m == 0 { "" } else { "opencam" }.into());
+    ui.set_rotated_log_mb([0.0, 0.2, 69.1][m]);
+    ui.set_rotated_log_count([0, 1, 14][m]);
     // The same sums the real scan makes for the Safe and Almost safe tiles (the Docker cache is left out here).
     let sum = |l: ModelRc<Left>| l.iter().map(|r| r.size_mb).sum::<f32>();
     ui.set_safe_scan_mb(
         sum(ui.get_caches())
+            + sum(ui.get_pycaches())
+            + sum(ui.get_browsers())
+            + sum(ui.get_flatpak_caches())
             + ui.get_apt_mb()
+            + ui.get_coredump_mb()
+            + ui.get_rotated_log_mb()
             + if ui.get_journal_mb() > 105.0 {
                 ui.get_journal_mb() - 105.0
             } else {
@@ -238,7 +288,13 @@ pub fn apply(ui: &Main, m: usize) {
         .filter(|v| v.keep == 0)
         .map(|v| v.size_mb)
         .sum();
-    ui.set_almost_free_mb(sum(ui.get_old_builds()) + sum(ui.get_installers()) + sum(ui.get_old_trash()) + old_versions);
+    ui.set_almost_free_mb(
+        sum(ui.get_old_builds())
+            + sum(ui.get_old_cargo())
+            + sum(ui.get_installers())
+            + sum(ui.get_old_trash())
+            + old_versions,
+    );
     // Two groups for `many` (an original and 2 copies, an original and 1), one pair for `single`.
     let dup = |id: &str, size: f32, orig: &str| Left {
         id: id.into(),
@@ -262,8 +318,25 @@ pub fn apply(ui: &Main, m: usize) {
     ];
     ui.set_dups(ModelRc::new(VecModel::from(rows[m].clone())));
     ui.set_dup_scanned(m != 0);
-    ui.set_snap_count([0, 0, 14][m]);
+    ui.set_snap_count([0, 0, 5][m]);
     ui.set_snap_oldest(["", "", "2025-11-02"][m].into());
+    // Fixed flags, not derived from today's date, so the snapshots do not change between runs.
+    let snap = |name: &str, keep| Snap {
+        name: name.into(),
+        keep,
+    };
+    let snaps = [
+        vec![],
+        vec![],
+        vec![
+            snap("2025-11-02_09-30-00", false),
+            snap("2026-03-14_10-00-01", false),
+            snap("2026-09-10_18-45-12", true),
+            snap("2026-10-30_08-00-00", true),
+            snap("2026-11-10_21-15-40", true),
+        ],
+    ];
+    ui.set_snaps(ModelRc::new(VecModel::from(snaps[m].clone())));
     ui.set_snap_set_up(m != 0);
     // Fixed ages so the snapshots do not change between runs.
     ui.set_store_ago([-1, 0, 75][m]);
@@ -287,6 +360,8 @@ pub fn apply(ui: &Main, m: usize) {
             swap: if m == 1 { vec!["/dev/zram0".into()] } else { vec![] },
             watcher: String::new(),
             oom_kills: if m == 2 { 2 } else { 0 },
+            zram_kb: if m == 1 { 262140 } else { 0 },
+            ram_kb: 39_845_888,
         },
         m == 2,
     );
@@ -316,10 +391,14 @@ pub fn apply(ui: &Main, m: usize) {
     );
     set_findings(
         ui,
-        (0..[0, 1, 16][m])
+        (0..[0, 1, 24][m])
             .map(|i| Finding {
-                code: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 8, 11, 13, 14][i],
-                level: [1, 0, 2, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0][i],
+                code: [
+                    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 8, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                ][i],
+                level: [
+                    1, 0, 2, 2, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 2, 1, 1, 1, -1, -1, -1, -1,
+                ][i],
                 subject: [
                     "tcp 139, tcp 445",
                     "firefox",
@@ -337,6 +416,14 @@ pub fn apply(ui: &Main, m: usize) {
                     "libc6, linux-base",
                     "",
                     "linux-image-generic",
+                    "Cafe WiFi",
+                    "Cafe WiFi, Hotel",
+                    "HTTP_PROXY=http://10.0.0.9:3128",
+                    "corp.crt",
+                    "Home",
+                    "",
+                    "",
+                    "",
                 ][i]
                     .into(),
                 extra: [
@@ -356,18 +443,28 @@ pub fn apply(ui: &Main, m: usize) {
                     "",
                     "3",
                     "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
                 ][i]
                     .into(),
                 // The browser index for an add-on (see `security::BROWSERS`); the count for code 13.
-                n: [3, 3, 3, 3, 3, 3, 3, 3, 1, 3, 3, 1, 3, 0, 12, 1][i],
+                n: [3, 3, 3, 3, 3, 3, 3, 3, 1, 3, 3, 1, 3, 0, 12, 1, 0, 2, 0, 1, 3, 0, 0, 0][i],
                 group: 0,
                 app: [
-                    "smbd", "Firefox", "", "", "", "", "", "", "Chromium", "", "", "smbd", "Firefox", "", "", "",
+                    "smbd", "Firefox", "", "", "", "", "", "", "Chromium", "", "", "smbd", "Firefox", "", "", "", "",
+                    "", "", "", "", "", "", "",
                 ][i]
                     .into(),
                 icon: crate::icon(
                     [
-                        "", "firefox", "", "", "", "", "", "", "chromium", "", "", "", "firefox", "", "", "",
+                        "", "firefox", "", "", "", "", "", "", "chromium", "", "", "", "firefox", "", "", "", "", "",
+                        "", "", "", "", "", "",
                     ][i],
                 ),
                 path: [
@@ -387,11 +484,96 @@ pub fn apply(ui: &Main, m: usize) {
                     "",
                     "",
                     "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
                 ][i]
                     .into(),
             })
+            .chain(
+                [
+                    (23, 1, "PasswordAuthentication yes, PermitRootLogin yes", 0),
+                    (24, -1, "", 1),
+                    (25, 1, "8.8.8.8 bank.example", 1),
+                    (26, -1, "", 0),
+                    (27, 1, "aa:bb:cc:dd:ee:01 = 192.168.1.1 192.168.1.9", 1),
+                    (28, -1, "", 0),
+                    (29, 1, "Samba: media; NFS: /srv", 0),
+                    (30, -1, "", 1),
+                ]
+                .into_iter()
+                .filter(|_| m == 2)
+                .map(|(code, level, subject, n)| Finding {
+                    code,
+                    level,
+                    subject: subject.into(),
+                    n,
+                    ..Finding::default()
+                }),
+            )
             .collect(),
     );
+    ui.set_nmap_available(m == 2);
+    ui.set_lan_state([0, 0, 2][m]);
+    // Router, this computer, a TV with a name and model, a camera, a repeater's shared MAC (two addresses), unknown.
+    ui.set_lan_risky(if m == 2 { 2 } else { 0 });
+    ui.set_lan_hosts(fixed([0, 0, 8][m], |i| LanHost {
+        ip: [
+            "192.168.1.1",
+            "192.168.1.23",
+            "192.168.1.40",
+            "192.168.1.41",
+            "192.168.1.50",
+            "192.168.1.51",
+            "192.168.1.60",
+            "192.168.1.61",
+        ][i]
+            .into(),
+        mac: [
+            "aa:bb:cc:dd:ee:01",
+            "",
+            "aa:bb:cc:dd:ee:40",
+            "f0:35:75:a7:b9:9d",
+            "5e:19:ff:10:ff:f1",
+            "5e:19:ff:10:ff:f1",
+            "20:98:ed:47:2f:03",
+            "10:65:19:6a:23:7a",
+        ][i]
+            .into(),
+        name: ["_gateway", "my-laptop", "", "Living Room TV", "", "", "", ""][i].into(),
+        vendor: [
+            "TP-Link Technologies",
+            "",
+            "Palladium Energy Eletronica DA Amazonia Ltda",
+            "Hui Zhou Gaoshengda Technology",
+            "",
+            "",
+            "",
+            "",
+        ][i]
+            .into(),
+        model: ["", "", "", "Smart TV Pro", "", "", "", ""][i].into(),
+        kind: [1, 2, 6, 3, 0, 0, 5, 0][i],
+        shared: [0, 0, 0, 0, 1, 1, 0, 0][i],
+        ports: [
+            "53 domain, 80 http, 443 https, 1900 upnp",
+            "",
+            "445 smb",
+            "8443 https",
+            "",
+            "",
+            "80 http, 554 rtsp",
+            "",
+        ][i]
+            .into(),
+        risky_ports: ["", "", "23 telnet, 139 smb", "", "", "23 telnet", "", ""][i].into(),
+        risky: [false, false, true, false, false, true, false, false][i],
+    }));
     ui.set_sec_tools(fixed(6, |i| SecTool {
         name: ["rkhunter", "chkrootkit", "lynis", "clamscan", "debsums", "aide"][i].into(),
         cmd: "sudo apt install rkhunter && sudo rkhunter --check".into(),
@@ -558,10 +740,40 @@ pub fn state(ui: &Main, page: i32, state: &str) {
             ui.set_boot_confirming(true);
         }
         (9, "busy") => ui.set_perf_busy(true),
+        (7 | 8 | 10 | 11 | 12, "busy") => {
+            ui.set_store_busy(true);
+            ui.set_app_busy(true);
+            ui.set_health_busy(true);
+            ui.set_security_busy(true);
+        }
         (7 | 13, "bottom") => ui.set_scroll_bottom(true),
         (10, "group1") => ui.set_store_group(1),
         (10, "group2") => ui.set_store_group(2),
         (10, "group3") => ui.set_store_group(3),
+        (10, "snapconfirm") => {
+            ui.set_app_action(19);
+            ui.set_app_id("2025-11-02_09-30-00".into());
+            ui.set_app_cmd("pkexec timeshift --delete --snapshot 2025-11-02_09-30-00 --scripted".into());
+            ui.set_app_confirming(true);
+        }
+        // The Safe tab scrolled to the cards after the caches (Python caches, system journal, crash dumps).
+        (10, "dumps") => ui.set_space_scroll(match ui.get_coredump_count() {
+            0 => 300.0,
+            1 => 620.0,
+            _ => 900.0,
+        }),
+        (10, "dumpconfirm") => {
+            ui.set_app_action(22);
+            ui.set_app_id("coredumps".into());
+            ui.set_app_cmd(storage::root_command(&[22]).into());
+            ui.set_app_freed(1850.0);
+            ui.set_app_confirming(true);
+        }
+        // Must analyze scrolled down to the Timeshift snapshots.
+        (10, "snaps") => {
+            ui.set_store_group(2);
+            ui.set_space_scroll(1600.0);
+        }
         // The bulk dialog of a tier, with enough rows to need the scroll cap; the first row is unticked.
         (10, "bulk0" | "bulk1") => {
             let tier = i32::from(state == "bulk1");
@@ -581,6 +793,20 @@ pub fn state(ui: &Main, page: i32, state: &str) {
                         (3, "apt-autoremove".to_string(), 120.0, ""),
                         (16, "apt-cache".to_string(), 840.0, ""),
                         (10, "journal".to_string(), 412.0, ""),
+                        (
+                            21,
+                            "/home/user/code/project".to_string(),
+                            38.0,
+                            "rm -r /home/user/code/project/**/__pycache__",
+                        ),
+                        (
+                            23,
+                            "google-chrome".to_string(),
+                            83.0,
+                            "rm -r '/home/user/.cache/google-chrome' '/home/user/.config/google-chrome/Crash Reports'",
+                        ),
+                        (22, "coredumps".to_string(), 1850.0, ""),
+                        (24, "rotated-logs".to_string(), 69.1, ""),
                     ])
                     .collect()
             } else {
@@ -642,8 +868,31 @@ pub fn state(ui: &Main, page: i32, state: &str) {
             ui.set_bulk_cmds_open(true);
             ui.set_bulk_confirming(true);
         }
+        // The review dialog of one Must analyze list (Steam leftovers), the second row unticked.
+        (10, "bulk2") => {
+            let rows: Vec<BulkRow> = (0..4)
+                .map(|i| BulkRow {
+                    action: 20,
+                    detail: "".into(),
+                    name: format!("Hi-Fi RUSH (#{})", 1_817_230 + i).into(),
+                    id: format!("/home/user/.steam/steam/steamapps/compatdata/{}", 1_817_230 + i).into(),
+                    size_mb: 906.0 - 40.0 * i as f32,
+                    on: i != 1,
+                    cmd: "gio trash -- /home/user/.steam/steam/steamapps/compatdata/1817230".into(),
+                })
+                .collect();
+            ui.set_store_group(2);
+            ui.set_bulk_title("Steam leftovers of uninstalled games".into());
+            ui.set_bulk_tier(2);
+            ui.set_bulk(ModelRc::new(VecModel::from(rows)));
+            show_bulk(ui);
+            ui.set_bulk_confirming(true);
+        }
         (7, "expanded") => ui.set_show_all_parts(true),
-        (12, "expanded") => ui.set_mem_info_open(true),
+        (12, "expanded") => {
+            ui.set_mem_info_open(true);
+            ui.set_oom_info_open(true);
+        }
         (3, "expanded") => ui.set_open_app("app-0".into()),
         (3, "confirm") => {
             ui.set_app_action(0);

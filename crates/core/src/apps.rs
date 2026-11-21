@@ -5,12 +5,12 @@ use std::{
     fs, io,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use crate::{
     autostart::{list, matches, parse, rules},
-    services::pkexec_run,
+    services::{output_within, pkexec_run},
 };
 
 pub(crate) const APT_GET: &str = "/usr/bin/apt-get";
@@ -36,11 +36,13 @@ pub enum Source {
     Deb,
     Flatpak,
     AppImage,
+    /// A system launcher no package owns (vendor installer script). Report only: there is nothing to uninstall.
+    Other,
 }
 
 #[derive(Clone, Debug)]
 pub struct App {
-    /// Package name, Flatpak id or AppImage file name: the stable id, validated before any action.
+    /// Package name, Flatpak id, AppImage file name or launcher file name: the stable id, validated before any action.
     pub id: String,
     pub name: String,
     pub source: Source,
@@ -132,12 +134,13 @@ impl Dirs {
     }
 }
 
-/// Runs with the C locale: Flatpak prints sizes as `40,6 MB` in some locales.
+/// How long a read-only command may run before it is killed (see `output_within`).
+pub(crate) const READ_LIMIT: Duration = Duration::from_secs(30);
+
+/// stdout of a read-only command, empty when it is missing, fails or times out. Runs with the C locale: Flatpak prints
+/// sizes as `40,6 MB` in some locales, and the labels we parse stay English.
 pub(crate) fn run(program: &str, args: &[&str]) -> String {
-    Command::new(program)
-        .args(args)
-        .env("LC_ALL", "C")
-        .output()
+    output_within(Command::new(program).args(args).env("LC_ALL", "C"), READ_LIMIT)
         .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
         .unwrap_or_default()
 }
@@ -184,7 +187,7 @@ fn parse_flatpaks(text: &str) -> Vec<(String, String, u64)> {
 
 /// `(package, file)` from `dpkg-query -S`: lines like `firefox: /usr/share/applications/firefox.desktop`, possibly
 /// `pkg:amd64` or `a, b: path`. Diversion lines are skipped.
-fn parse_owners(text: &str) -> Vec<(String, String)> {
+pub(crate) fn parse_owners(text: &str) -> Vec<(String, String)> {
     text.lines()
         .filter(|l| !l.starts_with("diversion"))
         .filter_map(|l| {
@@ -273,7 +276,7 @@ fn group_of(categories: &[&str]) -> Option<usize> {
     GROUPS.iter().position(|g| *g == name)
 }
 
-pub(crate) fn now() -> u64 {
+pub fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
@@ -305,6 +308,8 @@ fn debs(dirs: &Dirs) -> Vec<App> {
     }
     let paths: Vec<&str> = files.iter().filter_map(|f| f.to_str()).collect();
     let owners = parse_owners(&run("dpkg-query", &[&["-S"], &paths[..]].concat()));
+    let owned: HashSet<&str> = owners.iter().map(|(_, f)| f.as_str()).collect();
+    let others = others(dirs, &files, &owned);
     // One entry per package: its first launcher names it (libreoffice has a dozen).
     let mut pkgs: BTreeMap<String, (String, Option<usize>, String)> = BTreeMap::new();
     for (pkg, file) in owners.into_iter().filter(|(p, _)| valid_pkg(p)) {
@@ -333,11 +338,59 @@ fn debs(dirs: &Dirs) -> Vec<App> {
             name,
             id,
         })
+        .chain(others)
         .collect()
 }
 
-fn flatpaks(dirs: &Dirs) -> Vec<App> {
-    let list = parse_flatpaks(&run("flatpak", &["list", "--app", "--columns=application,name,size"]));
+/// Visible launchers in `files` that no package owns (Cisco Secure Client and other vendor installers write theirs by
+/// hand). shortcut: size stays 0 (shown as unknown); the program usually lives under `/opt`, not worth walking.
+fn others(dirs: &Dirs, files: &[PathBuf], owned: &HashSet<&str>) -> Vec<App> {
+    files
+        .iter()
+        .filter(|f| f.to_str().is_some_and(|s| !owned.contains(s)))
+        .filter_map(|f| {
+            let id = f.file_name()?.to_str()?.to_string();
+            let (name, group, icon) = launcher(f)?;
+            let stem = id.trim_end_matches(".desktop").to_lowercase();
+            Some(App {
+                icon,
+                size: 0,
+                manual: true,
+                essential: false,
+                last_activity: last_activity(dirs, None, &[&stem, &name.to_lowercase()]),
+                group: group.map_or(-1, |g| g as i32),
+                group_count: 0,
+                stale: false,
+                source: Source::Other,
+                name,
+                id,
+            })
+        })
+        .collect()
+}
+
+/// The installed Flatpak apps. `None` when Flatpak is there but could not answer (failed, timed out): that must never
+/// read as "nothing installed", or every folder in `~/.var/app` would look like a leftover. No `flatpak` program at all
+/// is a real empty list.
+fn flatpak_list() -> Option<Vec<(String, String, u64)>> {
+    flatpak_answer(command_read(Command::new("flatpak").args([
+        "list",
+        "--app",
+        "--columns=application,name,size",
+    ])))
+}
+
+fn flatpak_answer(result: io::Result<String>) -> Option<Vec<(String, String, u64)>> {
+    match result {
+        Ok(text) => Some(parse_flatpaks(&text)),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Some(Vec::new()),
+        Err(_) => None,
+    }
+}
+
+const FLATPAK_UNANSWERED: &str = "could not ask Flatpak, scan again";
+
+fn flatpaks(dirs: &Dirs, list: Vec<(String, String, u64)>) -> Vec<App> {
     list.into_iter()
         .map(|(id, name, size)| {
             let found = dirs
@@ -491,12 +544,22 @@ const SHARED_DATA: &[&str] = &[
     "xdg-desktop-portal",
 ];
 
+/// The names of the installed dpkg packages. `None` when `dpkg-query` is missing (not a Debian system), fails or times
+/// out, or lists nothing: an empty list would make every settings folder look abandoned.
+fn package_list() -> Option<String> {
+    packages_answer(command_read(Command::new("dpkg-query").args(["-W", "-f=${Package}\n"])))
+}
+
+fn packages_answer(result: io::Result<String>) -> Option<String> {
+    result.ok().filter(|t| !t.trim().is_empty())
+}
+
+const PACKAGES_UNREAD: &str = "could not read the package list, scan again";
+
 /// Lowercase names of everything installed: every dpkg package, plus the name and id of each app found.
-fn known_names(dirs: &Dirs, apps: &[App]) -> HashSet<String> {
-    let mut known: HashSet<String> = run("dpkg-query", &["-W", "-f=${Package}\n"])
-        .lines()
-        .map(str::to_lowercase)
-        .collect();
+/// `packages` is the output of `dpkg-query -W -f=${Package}\n`.
+fn known_names(dirs: &Dirs, apps: &[App], packages: &str) -> HashSet<String> {
+    let mut known: HashSet<String> = packages.lines().map(str::to_lowercase).collect();
     for a in apps {
         known.insert(a.id.to_lowercase());
         known.insert(a.name.to_lowercase());
@@ -561,10 +624,12 @@ pub fn home_data_path(dirs: &Dirs, id: &str) -> Option<PathBuf> {
 /// Settings folder of a removed app, to the Trash. Re-checked: the app may have been installed since the scan.
 pub fn trash_home_data(dirs: &Dirs, id: &str) -> io::Result<()> {
     let path = home_data_path(dirs, id).ok_or_else(|| io::Error::other("invalid folder"))?;
+    let flatpak = flatpak_list().ok_or_else(|| io::Error::other(FLATPAK_UNANSWERED))?;
     let mut apps = debs(dirs);
-    apps.extend(flatpaks(dirs));
+    apps.extend(flatpaks(dirs, flatpak));
     apps.extend(appimages(dirs));
-    if !home_leftovers(dirs, &known_names(dirs, &apps))
+    let packages = package_list().ok_or_else(|| io::Error::other(PACKAGES_UNREAD))?;
+    if !home_leftovers(dirs, &known_names(dirs, &apps, &packages))
         .iter()
         .any(|l| l.id == id)
     {
@@ -574,11 +639,17 @@ pub fn trash_home_data(dirs: &Dirs, id: &str) -> io::Result<()> {
 }
 
 pub fn scan(dirs: &Dirs, stale_months: u32) -> Scan {
+    let flatpak = flatpak_list();
+    let answered = flatpak.is_some();
     let mut apps = debs(dirs);
-    apps.extend(flatpaks(dirs));
+    apps.extend(flatpaks(dirs, flatpak.unwrap_or_default()));
     apps.extend(appimages(dirs));
-    let leftovers = leftovers(dirs, &apps);
-    let home_data = home_leftovers(dirs, &known_names(dirs, &apps));
+    // Without Flatpak's answer or the package list every app folder would look abandoned, so nothing is offered.
+    let leftovers = if answered { leftovers(dirs, &apps) } else { Vec::new() };
+    let home_data = match package_list() {
+        Some(packages) if answered => home_leftovers(dirs, &known_names(dirs, &apps, &packages)),
+        _ => Vec::new(),
+    };
     let (items, freed) = unused_flatpak().unwrap_or_default();
     let scan = Scan {
         apps,
@@ -826,8 +897,17 @@ pub fn uninstall_deb(pkg: &str) -> io::Result<()> {
     pkexec_run(APT_GET, &["remove", "-y", pkg])
 }
 
+/// Runs an action (no time limit: killing a deletion half way is worse than waiting).
 pub(crate) fn command_ok(cmd: &mut Command) -> io::Result<String> {
-    let out = cmd.env("LC_ALL", "C").output()?;
+    stdout_or_stderr(cmd.env("LC_ALL", "C").output()?)
+}
+
+/// `command_ok` for reads: killed after `READ_LIMIT`, and then an error.
+pub(crate) fn command_read(cmd: &mut Command) -> io::Result<String> {
+    stdout_or_stderr(output_within(cmd.env("LC_ALL", "C"), READ_LIMIT)?)
+}
+
+fn stdout_or_stderr(out: std::process::Output) -> io::Result<String> {
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
@@ -841,10 +921,8 @@ pub fn uninstall_flatpak(id: &str) -> io::Result<()> {
     if !valid_id(id) {
         return Err(io::Error::other("invalid application id"));
     }
-    if !parse_flatpaks(&run("flatpak", &["list", "--app", "--columns=application,name,size"]))
-        .iter()
-        .any(|(i, ..)| i == id)
-    {
+    let installed = flatpak_list().ok_or_else(|| io::Error::other(FLATPAK_UNANSWERED))?;
+    if !installed.iter().any(|(i, ..)| i == id) {
         return Err(io::Error::other("application is not installed, scan again"));
     }
     // Flatpak asks polkit itself for system installs.
@@ -926,10 +1004,8 @@ pub fn trash_leftover(dirs: &Dirs, id: &str) -> io::Result<()> {
     if !valid_id(id) {
         return Err(io::Error::other("invalid application id"));
     }
-    if parse_flatpaks(&run("flatpak", &["list", "--app", "--columns=application,name,size"]))
-        .iter()
-        .any(|(i, ..)| i == id)
-    {
+    let installed = flatpak_list().ok_or_else(|| io::Error::other(FLATPAK_UNANSWERED))?;
+    if installed.iter().any(|(i, ..)| i == id) {
         return Err(io::Error::other("application is installed again, scan again"));
     }
     trash_in(&dirs.flatpak_data(), id)
@@ -954,6 +1030,40 @@ pub fn trash_appimage(dirs: &Dirs, file: &str) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn no_package_list_means_no_home_leftovers() {
+        // Fedora (no dpkg-query), a failure and a timeout all end here: nothing may be offered or trashed.
+        assert_eq!(packages_answer(Err(io::Error::from(io::ErrorKind::NotFound))), None);
+        assert_eq!(packages_answer(Ok("\n".into())), None);
+        assert_eq!(
+            packages_answer(Ok("bash\nvlc\n".into())).as_deref(),
+            Some("bash\nvlc\n")
+        );
+        let d = Dirs {
+            home: tmp("nopkg"),
+            ..dirs(&tmp("nopkg"))
+        };
+        fs::create_dir_all(d.home.join(".config/nvim")).unwrap();
+        // With a real package list the folder is a leftover; known_names with an empty one would say the same for
+        // everything, which is why `scan` and `trash_home_data` stop earlier.
+        let all = home_leftovers(&d, &known_names(&d, &[], ""));
+        assert_eq!(all.len(), 1);
+        let _ = fs::remove_dir_all(&d.home);
+    }
+
+    #[test]
+    fn a_failed_flatpak_is_not_an_empty_list() {
+        let missing = io::Error::from(io::ErrorKind::NotFound);
+        assert_eq!(
+            flatpak_answer(Err(missing)),
+            Some(vec![]),
+            "no flatpak program: really none"
+        );
+        assert_eq!(flatpak_answer(Err(io::Error::other("timed out or failed"))), None);
+        let two = flatpak_answer(Ok("a.B\tB\t1 MB\nc.D\tD\t2 MB\n".into())).unwrap();
+        assert_eq!(two.len(), 2);
+    }
 
     fn tmp(name: &str) -> PathBuf {
         let p = std::env::temp_dir().join(format!("fastcheckup-apps-{name}-{}", std::process::id()));
@@ -985,6 +1095,31 @@ mod tests {
             group_count: 0,
             icon: String::new(),
         }
+    }
+
+    #[test]
+    fn unowned_launchers_are_listed_as_other() {
+        let home = tmp("others");
+        let d = dirs(&home);
+        fs::create_dir_all(&d.applications).unwrap();
+        let write = |n: &str, body: &str| {
+            let p = d.applications.join(n);
+            fs::write(&p, format!("[Desktop Entry]\nType=Application\n{body}\n")).unwrap();
+            p
+        };
+        let owned_file = write("owned.desktop", "Name=Owned");
+        let cisco = write("com.cisco.gui.desktop", "Name=Cisco Secure Client\nIcon=cisco");
+        let hidden = write("hidden.desktop", "Name=Hidden\nNoDisplay=true");
+        let files = [owned_file.clone(), cisco, hidden];
+        let owned: HashSet<&str> = [owned_file.to_str().unwrap()].into();
+        let got = others(&d, &files, &owned);
+        assert_eq!(got.len(), 1);
+        assert_eq!(
+            (got[0].name.as_str(), got[0].source),
+            ("Cisco Secure Client", Source::Other)
+        );
+        assert_eq!(got[0].id, "com.cisco.gui.desktop");
+        let _ = fs::remove_dir_all(&home);
     }
 
     #[test]
@@ -1177,7 +1312,7 @@ mod tests {
         }
         fs::create_dir_all(home.join(".vscode/extensions/devsense.phptools-1.0")).unwrap();
         let mut known: HashSet<String> = ["code", "google-chrome-stable", "dbeaver-ce"].map(String::from).into();
-        known.extend(known_names(&d, &[]).into_iter().filter(|k| k == "devsense"));
+        known.extend(known_names(&d, &[], "").into_iter().filter(|k| k == "devsense"));
         let ids: Vec<String> = home_leftovers(&d, &known).into_iter().map(|l| l.id).collect();
         assert_eq!(ids.len(), 2, "{ids:?}");
         assert!(ids.contains(&".config/Insync".into()) && ids.contains(&".local/share/Insync".into()));

@@ -2,7 +2,7 @@ app-id: io.github.evandro777.FastCheckup
 runtime: org.freedesktop.Platform
 # Bump together with: the container image tag and the rust-stable lines in .github/workflows/flatpak.yml, and the
 # header of flatpak/build.sh.
-runtime-version: "25.08"
+runtime-version: "26.08"
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
@@ -43,6 +43,8 @@ modules:
         path: ..
         skip:
           - target
+          - .git
+          - docs/screenshots
           - dev
           - .claude
           - flatpak/build-dir
