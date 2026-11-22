@@ -10,14 +10,14 @@ description = "Light and fast Linux app built in Rust with Slint."
 
 [dependencies]
 fastcheckup-core = { path = "../core" }
-slint = { version = "1.18", default-features = false, features = ["std", "backend-winit", "renderer-software", "software-renderer-systemfonts", "compat-1-2", "unstable-winit-030"] }
+slint = { version = "1.19", default-features = false, features = ["std", "backend-winit", "renderer-software", "software-renderer-systemfonts", "compat-1-2", "unstable-winit-030"] }
 
 [features]
 # Canned data for scripts/ui-snapshot.sh; never in a release.
 fixtures = []
 
 [build-dependencies]
-slint-build = "1.18"
+slint-build = "1.19"
 
 # `cargo deb -p fastcheckup` (CI builds it on the oldest runner, so the glibc requirement stays low).
 [package.metadata.deb]
