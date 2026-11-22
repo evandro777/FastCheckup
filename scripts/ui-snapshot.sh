@@ -45,7 +45,8 @@ for name in "${names[@]}"; do
       sleep 0.2
     done
     sleep 1
-    DISPLAY=$DISPLAY_NUM import -window root "$OUT/$name-$mode${STATE:+-$STATE}.png"
+    # The window only, not the 1280x800 root (no black margins).
+    DISPLAY=$DISPLAY_NUM import -window "$(DISPLAY=$DISPLAY_NUM xdotool search --name FastCheckup | head -1)" "$OUT/$name-$mode${STATE:+-$STATE}.png"
     kill "$APP" 2>/dev/null || true
     wait "$APP" 2>/dev/null || true
     APP=

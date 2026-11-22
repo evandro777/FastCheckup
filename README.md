@@ -3,6 +3,20 @@
 A light and fast Linux app that **shows what is slow, large, unused or exposed** on your computer, and lets you act on
 each item one at a time. It never cleans everything in one click. Built with Rust + Slint. GPL-3.0-or-later.
 
+![FastCheckup Overview](docs/screenshots/overview.png)
+
+<details>
+<summary>More screenshots</summary>
+
+![Space: clean-up sorted by how safe it is](docs/screenshots/space.png)
+![Services](docs/screenshots/services.png)
+![Security and local network](docs/screenshots/security.png)
+![Apps](docs/screenshots/apps.png)
+
+</details>
+
+_Screenshots use sample data._
+
 ## What it shows
 
 - **Overview**: One card per area with its status, plus a **Right now** check of memory, swap, load and the busiest apps.
@@ -16,7 +30,7 @@ each item one at a time. It never cleans everything in one click. Built with Rus
 
 ## How it behaves
 
-- **Scans never change anything.** Each change is a button on one item, or a reviewed bulk clean-up of the Safe and   Almost safe groups, behind a confirm dialog that shows exactly what will run, and it is logged in History. The   root steps of a bulk clean-up (apt autoremove, apt clean, journal) run in one administrator prompt.
+- **Scans never change anything.** Each change is a button on one item, or a reviewed bulk clean-up of the Safe and Almost safe groups, behind a confirm dialog that shows exactly what will run, and it is logged in History. The root steps of a bulk clean-up (apt autoremove, apt clean, journal) run in one administrator prompt.
 - **Reversible where possible:** files go to the Trash, services are disabled (not removed), startup entries get an override instead of an edit, and the GRUB change keeps a backup.
 - **Honest wording:** it says "last data activity", never "unused", and "nothing visible looks wrong", never "your system is clean".
 - **Essential system software** is marked as such and protected.
@@ -34,9 +48,9 @@ An inspector inside a sandbox only sees its own files and programs, so the app h
 
 #### Install from file (no updates)
 
-A `.flatpak` file downloaded from Releases is a one-off install (will not auto update). To get automatic updates, go to [Install with automatic updates](<#Install with automatic updates>).
+A `.flatpak` file downloaded from Releases is a one-off install (will not auto update). To get automatic updates, go to [Install with automatic updates](#install-with-automatic-updates).
 
-Download `FastClipboard-<version>-x86_64.flatpak` from [Releases](https://github.com/evandro777/FastCheckup/releases), then execute:
+Download `FastCheckup-<version>-x86_64.flatpak` from [Releases](https://github.com/evandro777/FastCheckup/releases), then execute:
 
 ```bash
 flatpak install --user ~/Downloads/FastCheckup-<version>-x86_64.flatpak
@@ -80,7 +94,7 @@ The app never runs as root. Actions that need it ask for your password through `
 cargo run --profile fast
 ```
 
-Needs Rust 1.92 or newer (the `rust-version` in `Cargo.toml`, also checked in CI).
+Needs Rust 1.95 or newer (the `rust-version` in `Cargo.toml`, also checked in CI).
 
 System deps (Debian family): `libfontconfig-dev libxkbcommon-dev libxkbcommon-x11-dev libx11-dev libxcb1-dev`.
 Contributor notes are in `AGENTS.md` and `CONTRIBUTING.md`.

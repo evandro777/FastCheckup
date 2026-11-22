@@ -27,6 +27,27 @@ fn text(mode: usize, make: impl Fn(usize) -> String) -> SharedString {
     (0..[0, 1, 4][mode]).map(make).collect::<Vec<_>>().join("\n").into()
 }
 
+// Realistic names so the screenshots do not look like test data.
+const APPS: [&str; 8] = [
+    "firefox", "code", "slack", "spotify", "steam", "discord", "telegram", "dropbox",
+];
+const SVCS: [&str; 8] = [
+    "cups",
+    "docker",
+    "bluetooth",
+    "snapd",
+    "avahi-daemon",
+    "ModemManager",
+    "apache2",
+    "cron",
+];
+fn app(i: usize) -> &'static str {
+    APPS[i % APPS.len()]
+}
+fn svc(i: usize) -> &'static str {
+    SVCS[i % SVCS.len()]
+}
+
 fn left(i: usize, what: &str) -> Left {
     Left {
         id: format!("{what}-{i}").into(),
@@ -41,24 +62,20 @@ fn left(i: usize, what: &str) -> Left {
 pub fn apply(ui: &Main, m: usize) {
     ui.set_rows(model(m, |i| Row {
         file: format!("app{i}.desktop").into(),
-        name: format!("Example startup app {i}").into(),
+        name: app(i).into(),
         comment: "Does something at login".into(),
-        exec: format!("/usr/bin/example-{i} --background").into(),
+        exec: format!("/usr/bin/{} --background", app(i)).into(),
         source: format!("/etc/xdg/autostart/app{i}.desktop").into(),
         target: format!("/home/user/.config/autostart/app{i}.desktop").into(),
         essential: i == 1,
         state: (i % 2) as i32,
-        duplicate_of: if i == 2 {
-            "Example startup app 0".into()
-        } else {
-            "".into()
-        },
+        duplicate_of: if i == 2 { app(0).into() } else { "".into() },
         ..Row::default()
     }));
     let history = model(m, |i| HistoryRow {
         time: "2026-10-28 14:05".into(),
         kind: (i % 5) as i32,
-        name: format!("example-{i}").into(),
+        name: app(i).into(),
     });
     ui.set_history_text(
         (0..history.row_count())
@@ -74,22 +91,18 @@ pub fn apply(ui: &Main, m: usize) {
     );
     ui.set_history(history);
     ui.set_services(model(m, |i| Svc {
-        unit: format!("example-{i}.service").into(),
+        unit: format!("{}.service", svc(i)).into(),
         description: "A background program that takes a while to start".into(),
         enabled: i % 2 == 0,
         active: i % 3 != 0 || i == 0,
         secs: 0.5 * (i + 1) as f32,
         essential: i == 1,
         background: i % 4 == 0,
-        package: if i % 3 == 1 {
-            format!("example-{i}-daemon").into()
-        } else {
-            "".into()
-        },
+        package: if i % 3 == 1 { svc(i).into() } else { "".into() },
         packaged: true,
         delay: if i == 0 { 122.3 } else { 0.0 },
         triggers: if i == 0 {
-            "example-2.socket example-2.path".into()
+            format!("{0}.socket {0}.path", svc(2)).into()
         } else {
             "".into()
         },
@@ -103,7 +116,7 @@ pub fn apply(ui: &Main, m: usize) {
             "".into()
         },
         man: if i == 1 {
-            format!("example-{i}(8)").into()
+            format!("{}(8)", svc(i)).into()
         } else {
             "".into()
         },
@@ -124,7 +137,7 @@ pub fn apply(ui: &Main, m: usize) {
         name: if i == 3 {
             "a-program-with-a-very-long-name-that-has-to-be-cut-somewhere".into()
         } else {
-            format!("example-app-{i}").into()
+            app(i).into()
         },
         procs: if m == 2 { 1 + 3 * i as i32 } else { 1 },
         cpu: 42.0 - 8.0 * i as f32,
@@ -139,7 +152,7 @@ pub fn apply(ui: &Main, m: usize) {
         unit: if i % 3 == 2 {
             format!("mnt-data{i}.mount")
         } else {
-            format!("example-{i}.service")
+            format!("{}.service", svc(i))
         }
         .into(),
         at: 2.0 + i as f32,
@@ -162,7 +175,21 @@ pub fn apply(ui: &Main, m: usize) {
 
     ui.set_apps(model(m, |i| AppRow {
         id: format!("app-{i}").into(),
-        name: format!("Example application {i}").into(),
+        name: [
+            "Firefox",
+            "Visual Studio Code",
+            "Slack",
+            "Spotify",
+            "Steam",
+            "Discord",
+            "VLC",
+            "GIMP",
+            "Telegram",
+            "Dropbox",
+            "LibreOffice",
+            "Thunderbird",
+        ][i % 12]
+            .into(),
         source: (i % 4) as i32,
         size_mb: 120.0 * (i + 1) as f32,
         manual: i % 2 == 0,
@@ -180,10 +207,10 @@ pub fn apply(ui: &Main, m: usize) {
         size_mb: 310.0,
     }));
     ui.set_leftovers(model(m, |i| left(i, "flatpak-data")));
-    ui.set_home_data(model(m, |i| left(i, ".config/example")));
+    ui.set_home_data(model(m, |i| left(i, ".config/vlc")));
     ui.set_stale_startup(model(m, |i| Left {
         id: format!("gone{i}.desktop").into(),
-        used: format!("Example removed app {i}").into(),
+        used: ["Skype", "Zoom", "Evolution"][i % 3].into(),
         path: format!("gone{i} start").into(),
         ..Left::default()
     }));
@@ -249,7 +276,9 @@ pub fn apply(ui: &Main, m: usize) {
         ..left(i, "deleted-folder")
     }));
     ui.set_installers(model(m, |i| left(i, "installer.deb")));
-    ui.set_caches(model(m, |i| left(i, "cache")));
+    ui.set_caches(model(m, |i| {
+        left(i, ["mesa_shader_cache", "thumbnails", "pip", "fontconfig"][i % 4])
+    }));
     ui.set_pycaches(model(m, |i| left(i, "~/code/project")));
     ui.set_browsers(model(m, |i| left(i, ["google-chrome", "firefox", "chromium"][i % 3])));
     ui.set_docker(fixed(if m == 0 { 0 } else { 2 }, |i| Dock {
@@ -607,7 +636,7 @@ fn sys(m: usize) -> sysinfo::Info {
         } else {
             vec![]
         },
-        hostname: "example-pc".into(),
+        hostname: "my-laptop".into(),
         uptime_secs: if m == 2 {
             3 * 86400 + 5 * 3600 + 12 * 60
         } else {
@@ -716,7 +745,7 @@ pub fn state(ui: &Main, page: i32, state: &str) {
                 ui.set_confirming(true);
             }
         }
-        (1, "expanded") => ui.set_open_unit("example-0.service".into()),
+        (1, "expanded") => ui.set_open_unit(format!("{}.service", svc(0)).into()),
         (1, "confirm") => {
             if let Some(s) = ui.get_services().row_data(0) {
                 ui.set_svc_pending(s);

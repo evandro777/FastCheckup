@@ -10,12 +10,41 @@
   </developer>
   <url type="homepage">https://github.com/evandro777/FastCheckup</url>
   <description>
-    <p>FastCheckup lists what starts when you log in and lets you disable or restore each entry. It never changes system files, asks before every change and keeps a history. More checks are planned.</p>
+    <p>FastCheckup shows what is slow, large, unused or exposed on your computer and lets you act on each item one at a time. Nothing changes until you confirm it, most changes can be undone, and every change is logged in History.</p>
+    <ul>
+      <li>Speed: startup entries, services and where boot time goes</li>
+      <li>Space: caches, build folders, old installers and leftovers, sorted by how safe they are to remove</li>
+      <li>Safety: disk health, open ports, things that start by themselves, browser add-ons and weak spots in your network</li>
+      <li>Apps: installed Debian, Flatpak and AppImage apps with their size and last data activity</li>
+      <li>System: what this computer is, and whether graphics acceleration works</li>
+    </ul>
   </description>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://evandro777.github.io/FastCheckup/screenshots/overview.png</image>
+      <caption>Overview: one card per area and what is using memory right now</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://evandro777.github.io/FastCheckup/screenshots/space.png</image>
+      <caption>Space: clean-ups sorted by how safe they are to remove</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://evandro777.github.io/FastCheckup/screenshots/services.png</image>
+      <caption>Services: what each one is and what disabling it does</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://evandro777.github.io/FastCheckup/screenshots/security.png</image>
+      <caption>Security: devices on your local network and their open ports</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://evandro777.github.io/FastCheckup/screenshots/apps.png</image>
+      <caption>Apps: installed programs with size and last data activity</caption>
+    </screenshot>
+  </screenshots>
   <launchable type="desktop-id">io.github.evandro777.FastCheckup.desktop</launchable>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="0.1.0" date="2026-01-01">
+    <release version="0.1.0" date="2026-11-22">
       <description>
         <p>First release.</p>
       </description>

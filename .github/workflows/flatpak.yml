@@ -119,7 +119,6 @@ jobs:
           sed -i 's/^ *//' site/fastcheckup.flatpakrepo
           # The landing page and its screenshots live in the repo.
           cp docs/site/index.html site/
-          # FastCheckup has no screenshots yet; the page works without them.
           if compgen -G "docs/screenshots/*.png" >/dev/null; then mkdir site/screenshots && cp docs/screenshots/*.png site/screenshots/; fi
       - uses: actions/upload-pages-artifact@v5
         with:

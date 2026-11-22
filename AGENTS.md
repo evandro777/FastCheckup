@@ -38,7 +38,7 @@ dev/gen_po.py             writes the .po files from one table
 scripts/ui-snapshot.sh    renders pages on a private Xvfb with canned data (crates/app/src/fixtures.rs, built with `--features fixtures` (the script does it; without it the env var does nothing), env FASTCHECKUP_FIXTURES=empty|single|many, FASTCHECKUP_PAGE=<n>) to target/ui-snapshots/
 crates/app/src/host.rs    Flatpak only: relaunches the app on the host (`flatpak-spawn --host`), copied from FastProcMan's. Needs `--talk-name=org.freedesktop.Flatpak` in the manifest, so the Flatpak is NOT sandboxed (on purpose: for auto-update). `instance::send` comes before `host::run()`. If the host copy fails the app runs in the sandbox and `Main.sandboxed` shows a warning on Overview (`STATE=sandboxed` in the snapshot script)
 flatpak/                  manifest, build.sh (vendors crates, builds outside the repo), new-signing-key.sh; CI: flatpak.yml (signed remote on GitHub Pages)
-docs/                     FLATPAK-SIGNING.md, landing page `site/index.html` (no screenshots yet)
+docs/                     FLATPAK-SIGNING.md, landing page `site/index.html`, `screenshots/*.png` (renders of the `many` fixtures from `scripts/ui-snapshot.sh`; the Pages step copies them next to the page and the metainfo links to them there)
 ```
 
 ## Commands
